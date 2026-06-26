@@ -1,0 +1,263 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      String   @default("RESEARCHER")
+  avatar    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  notifications Notification[]
+  logs          Log[]
+}
+
+model Topology {
+  id          String   @id @default(cuid())
+  name        String
+  type        String
+  description String?
+  isActive    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  devices          Device[]
+  networkEvents    NetworkEvent[]
+  performanceTests PerformanceTest[]
+}
+
+model Device {
+  id              String   @id @default(cuid())
+  name            String
+  type            String
+  status          String   @default("OFFLINE")
+  ipAddress       String?
+  macAddress      String?
+  manufacturer    String?
+  model           String?
+  osVersion       String?
+  openFlowVersion String?
+  dpId            String?  @unique
+  vlanId          Int?
+  layer           String?
+  priority        Int?
+  isMaster        Boolean?
+  role            String?
+  controllerId    String?
+  topologyId      String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  topology    Topology    @relation(fields: [topologyId], references: [id], onDelete: Cascade)
+  controller  Controller? @relation(fields: [controllerId], references: [id])
+  flowEntries FlowEntry[]
+  sourceLinks Link[]      @relation("SourceDevice")
+  targetLinks Link[]      @relation("TargetDevice")
+}
+
+model Controller {
+  id                String   @id @default(cuid())
+  name              String
+  type              String   @default("RYU")
+  ipAddress         String
+  port              Int      @default(6633)
+  restApiPort       Int      @default(8080)
+  status            String   @default("OFFLINE")
+  version           String?
+  uptime            Int?
+  connectedSwitches Int      @default(0)
+  flowCount         Int      @default(0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  devices Device[]
+}
+
+model FlowEntry {
+  id            String   @id @default(cuid())
+  priority      Int      @default(100)
+  matchCriteria String
+  instructions  String
+  timeoutIdle   Int?
+  timeoutHard   Int?
+  byteCount     Int      @default(0)
+  packetCount   Int      @default(0)
+  duration      Int?
+  status        String   @default("INSTALLED")
+  deviceId      String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  device Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+}
+
+model Link {
+  id         String   @id @default(cuid())
+  sourceId   String
+  targetId   String
+  bandwidth  Int?
+  latency    Float?
+  status     String   @default("OFFLINE")
+  type       String?
+  sourcePort Int?
+  targetPort Int?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  source Device @relation("SourceDevice", fields: [sourceId], references: [id], onDelete: Cascade)
+  target Device @relation("TargetDevice", fields: [targetId], references: [id], onDelete: Cascade)
+}
+
+model PerformanceTest {
+  id             String    @id @default(cuid())
+  name           String
+  type           String
+  status         String    @default("PENDING")
+  topologyId     String
+  sourceDeviceId String?
+  targetDeviceId String?
+  duration       Int?
+  config         String?
+  startedAt      DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  topology       Topology            @relation(fields: [topologyId], references: [id], onDelete: Cascade)
+  results        PerformanceResult[]
+  traditionalFor ComparisonResult[]  @relation("TraditionalTest")
+  sdnFor         ComparisonResult[]  @relation("SdnTest")
+}
+
+model PerformanceResult {
+  id         String   @id @default(cuid())
+  testId     String
+  metric     String
+  value      Float
+  unit       String
+  minValue   Float?
+  maxValue   Float?
+  stdDev     Float?
+  sampleSize Int?
+  rawData    String?
+  timestamp  DateTime @default(now())
+
+  test PerformanceTest @relation(fields: [testId], references: [id], onDelete: Cascade)
+}
+
+model ComparisonResult {
+  id                    String   @id @default(cuid())
+  traditionalTestId     String
+  sdnTestId             String
+  latencyImprovement    Float?
+  throughputImprovement Float?
+  packetLossReduction   Float?
+  recoveryImprovement   Float?
+  jitterReduction       Float?
+  summary               String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  traditionalTest PerformanceTest @relation("TraditionalTest", fields: [traditionalTestId], references: [id], onDelete: Cascade)
+  sdnTest         PerformanceTest @relation("SdnTest", fields: [sdnTestId], references: [id], onDelete: Cascade)
+
+  @@unique([traditionalTestId, sdnTestId])
+}
+
+model Report {
+  id          String   @id @default(cuid())
+  title       String
+  type        String
+  format      String   @default("PDF")
+  data        String?
+  fileUrl     String?
+  generatedBy String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  title     String
+  message   String
+  type      String
+  read      Boolean  @default(false)
+  userId    String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Alert {
+  id           String    @id @default(cuid())
+  title        String
+  message      String
+  severity     String    @default("INFO")
+  source       String?
+  acknowledged Boolean   @default(false)
+  resolved     Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+  resolvedAt   DateTime?
+}
+
+model Log {
+  id        String   @id @default(cuid())
+  action    String
+  entity    String?
+  entityId  String?
+  details   String?
+  userId    String?
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+}
+
+model QoSPolicy {
+  id            String   @id @default(cuid())
+  name          String
+  description   String?
+  priority      String   @default("MEDIUM")
+  dscpValue     Int?
+  queueId       Int?
+  minRate       Int?
+  maxRate       Int?
+  matchCriteria String?
+  enabled       Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Vlan {
+  id        String   @id @default(cuid())
+  vlanId    Int      @unique
+  name      String
+  subnet    String?
+  gateway   String?
+  type      String   @default("USER")
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model NetworkEvent {
+  id         String   @id @default(cuid())
+  type       String
+  message    String
+  source     String?
+  severity   String?
+  topologyId String?
+  metadata   String?
+  createdAt  DateTime @default(now())
+
+  topology Topology? @relation(fields: [topologyId], references: [id])
+}

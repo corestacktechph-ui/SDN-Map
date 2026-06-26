@@ -1,0 +1,238 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 221.2 83.2% 53.3%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 221.2 83.2% 53.3%;
+    --radius: 0.5rem;
+    --success: 142.1 76.2% 36.3%;
+    --success-foreground: 355.7 100% 97.3%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 48 96% 89%;
+    --info: 221.2 83.2% 53.3%;
+    --info-foreground: 210 40% 98%;
+    --sidebar-background: 222.2 84% 4.9%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-muted: 217.2 32.6% 17.5%;
+    --sidebar-accent: 217.2 32.6% 17.5%;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 217.2 91.2% 59.8%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 224.3 76.3% 48%;
+    --success: 142.1 70.6% 45.3%;
+    --success-foreground: 144 80% 10%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 48 96% 89%;
+    --info: 217.2 91.2% 59.8%;
+    --info-foreground: 210 40% 98%;
+    --sidebar-background: 0 0% 0%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-muted: 217.2 32.6% 17.5%;
+    --sidebar-accent: 217.2 32.6% 17.5%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@layer utilities {
+  .network-grid {
+    background-image: radial-gradient(circle, hsl(var(--muted-foreground) / 0.1) 1px, transparent 1px);
+    background-size: 20px 20px;
+  }
+
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--muted-foreground) / 0.3);
+    border-radius: 3px;
+  }
+}
+
+@layer components {
+  .topology-node {
+    @apply rounded-lg border-2 p-2 text-center text-xs font-medium transition-all duration-500;
+  }
+
+  .topology-node-core {
+    @apply topology-node border-blue-500 bg-blue-500/10 text-blue-500;
+  }
+
+  .topology-node-core.online {
+    @apply shadow-[0_0_15px] shadow-blue-500/40;
+  }
+
+  .topology-node-distribution {
+    @apply topology-node border-purple-500 bg-purple-500/10 text-purple-500;
+  }
+
+  .topology-node-distribution.online {
+    @apply shadow-[0_0_15px] shadow-purple-500/40;
+  }
+
+  .topology-node-access {
+    @apply topology-node border-emerald-500 bg-emerald-500/10 text-emerald-500;
+  }
+
+  .topology-node-access.online {
+    @apply shadow-[0_0_15px] shadow-emerald-500/40;
+  }
+
+  .topology-node-server {
+    @apply topology-node border-amber-500 bg-amber-500/10 text-amber-500;
+  }
+
+  .topology-node-server.online {
+    @apply shadow-[0_0_15px] shadow-amber-500/40;
+  }
+
+  @keyframes pulse-glow {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+
+  .animate-pulse-glow {
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
+
+  @keyframes flow-dot {
+    0% { transform: translateX(0); opacity: 1; }
+    100% { transform: translateX(var(--flow-distance, 100px)); opacity: 0; }
+  }
+
+  .animate-flow {
+    animation: flow-dot 1.5s linear infinite;
+  }
+
+  @keyframes flow-dot-reverse {
+    0% { transform: translateX(0); opacity: 1; }
+    100% { transform: translateX(calc(var(--flow-distance, 100px) * -1)); opacity: 0; }
+  }
+
+  .animate-flow-reverse {
+    animation: flow-dot-reverse 2s linear infinite;
+  }
+
+  @keyframes connection-pulse {
+    0% { stroke-opacity: 0.3; }
+    50% { stroke-opacity: 1; }
+    100% { stroke-opacity: 0.3; }
+  }
+
+  .animate-connection {
+    animation: connection-pulse 3s ease-in-out infinite;
+  }
+
+  @keyframes traffic-up {
+    0% { transform: translateY(0); opacity: 1; }
+    100% { transform: translateY(-8px); opacity: 0; }
+  }
+
+  .animate-traffic-up {
+    animation: traffic-up 1s ease-out forwards;
+  }
+
+  @keyframes fade-in-up {
+    0% { opacity: 0; transform: translateY(10px); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
+
+  .animate-fade-in-up {
+    animation: fade-in-up 0.5s ease-out forwards;
+  }
+
+  .device-status-dot {
+    @apply inline-block h-2.5 w-2.5 rounded-full transition-all duration-500;
+  }
+
+  .device-status-dot.online {
+    @apply bg-green-500 shadow-[0_0_10px] shadow-green-500/60;
+  }
+
+  .device-status-dot.offline {
+    @apply bg-red-500;
+  }
+
+  .device-status-dot.warning {
+    @apply bg-yellow-500 shadow-[0_0_10px] shadow-yellow-500/60 animate-pulse-glow;
+  }
+
+  /* SVG connection lines */
+  .connection-line {
+    stroke-dasharray: 6 4;
+  }
+
+  .connection-line.active {
+    stroke: rgb(59 130 246 / 0.4);
+    animation: connection-pulse 3s ease-in-out infinite;
+  }
+
+  .connection-line.down {
+    stroke: rgb(239 68 68 / 0.2);
+    stroke-dasharray: 2 4;
+  }
+
+  /* Heat map effect for active nodes */
+  .node-heat {
+    transition: box-shadow 0.5s ease;
+  }
+
+  .node-heat.active {
+    box-shadow: 0 0 20px currentColor, 0 0 40px currentColor;
+  }
+}

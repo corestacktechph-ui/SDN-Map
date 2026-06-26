@@ -1,0 +1,97 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: amira-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: amira_capstone
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - amira-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  nextjs-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: amira-nextjs
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: "postgresql://postgres:postgres@postgres:5432/amira_capstone?schema=public"
+      NEXTAUTH_URL: "http://localhost:3000"
+      NEXTAUTH_SECRET: "amira-capstone-super-secret-key-change-in-production"
+      JWT_SECRET: "amira-capstone-jwt-secret-change-in-production"
+      NEXT_PUBLIC_APP_URL: "http://localhost:3000"
+      RYU_CONTROLLER_HOST: "ryu-controller"
+      RYU_CONTROLLER_PORT: "6633"
+      RYU_REST_API_PORT: "8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - amira-network
+
+  ryu-controller:
+    build:
+      context: .
+      dockerfile: Dockerfile.ryu
+    container_name: amira-ryu
+    restart: unless-stopped
+    ports:
+      - "6633:6633"
+      - "8080:8080"
+    volumes:
+      - ./scripts/ryu:/app/ryu_apps
+    networks:
+      - amira-network
+
+  # Mininet service - requires privileged mode and specific Linux capabilities
+  # Note: Mininet requires actual Linux kernel features and may not work in all Docker environments
+  mininet:
+    image: iwaseyusuke/mininet:latest
+    container_name: amira-mininet
+    restart: unless-stopped
+    privileged: true
+    stdin_open: true
+    tty: true
+    volumes:
+      - ./scripts/mininet:/app/mininet_scripts
+      - ./scripts/tests:/app/test_scripts
+      - ./network:/app/network
+    networks:
+      - amira-network
+    command: /bin/bash -c "while true; do sleep 3600; done"
+
+  # Nginx reverse proxy
+  nginx:
+    image: nginx:alpine
+    container_name: amira-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./public:/usr/share/nginx/html
+    depends_on:
+      - nextjs-app
+    networks:
+      - amira-network
+
+volumes:
+  postgres_data:
+
+networks:
+  amira-network:
+    driver: bridge

@@ -1,0 +1,45 @@
+{
+  "version": "1.0.0",
+  "monitoring": {
+    "collection_interval_seconds": 5,
+    "retention_period_hours": 24,
+    "export_enabled": true,
+    "export_format": "json"
+  },
+  "metrics": {
+    "dhcp": {
+      "lease_count": { "enabled": true, "unit": "count", "threshold_warn": 50, "threshold_crit": 150 },
+      "server_uptime": { "enabled": true, "unit": "seconds" },
+      "offer_latency": { "enabled": true, "unit": "ms", "threshold_warn": 50, "threshold_crit": 200 },
+      "renewal_rate": { "enabled": true, "unit": "leases/min" }
+    },
+    "vrrp": {
+      "state": { "enabled": true, "values_master": "MASTER", "values_backup": "BACKUP" },
+      "master_uptime": { "enabled": true, "unit": "seconds" },
+      "advert_received": { "enabled": true, "unit": "count" },
+      "priority": { "enabled": true, "unit": "0-255" },
+      "pid_valid": { "enabled": true, "type": "boolean" }
+    },
+    "connectivity": {
+      "core_latency": { "enabled": true, "unit": "ms", "threshold_warn": 10, "threshold_crit": 50 },
+      "distribution_latency": { "enabled": true, "unit": "ms", "threshold_warn": 20, "threshold_crit": 80 },
+      "server_latency": { "enabled": true, "unit": "ms", "threshold_warn": 5, "threshold_crit": 30 },
+      "packet_loss": { "enabled": true, "unit": "%", "threshold_warn": 1, "threshold_crit": 10 }
+    },
+    "redundancy": {
+      "core_links_up": { "enabled": true, "unit": "count", "threshold_warn": 2, "threshold_crit": 1 },
+      "distribution_links_up": { "enabled": true, "unit": "count", "threshold_warn": 4, "threshold_crit": 2 }
+    }
+  },
+  "recovery": {
+    "auto_heal_enabled": true,
+    "max_concurrent_recoveries": 2,
+    "cooldown_period_seconds": 60,
+    "recovery_strategies": {
+      "dhcp_restart": { "command": "bash /app/network/configs/dhcp/dhcp_server.sh restart", "timeout": 10 },
+      "vrrp_restart": { "command": "python3 /app/network/configs/vrrp/vrrp_manager.py start", "timeout": 10 },
+      "ovs_restart": { "command": "systemctl restart openvswitch-switch", "timeout": 15 },
+      "dnsmasq_reload": { "command": "pkill -HUP dnsmasq", "timeout": 5 }
+    }
+  }
+}

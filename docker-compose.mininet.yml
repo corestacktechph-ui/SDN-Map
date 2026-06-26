@@ -1,0 +1,87 @@
+version: '3.8'
+
+services:
+  # Traditional Network Simulation
+  mininet-traditional:
+    image: iwaseyusuke/mininet:latest
+    container_name: amira-traditional-network
+    privileged: true
+    network_mode: host
+    volumes:
+      - ./scripts:/workspace/scripts
+      - ./network:/workspace/network
+      - ./network/results:/workspace/results
+    working_dir: /workspace
+    stdin_open: true
+    tty: true
+    command: >
+      bash -c "
+        apt-get update -qq &&
+        apt-get install -y -qq dnsmasq iproute2 iputils-ping iperf3 python3-pip &&
+        pip3 install -q matplotlib numpy &&
+        echo 'Traditional Network Ready. Run: python3 scripts/mininet/traditional_topology.py' &&
+        tail -f /dev/null
+      "
+
+  # SDN Network Simulation with Ryu Controller
+  mininet-sdn:
+    image: iwaseyusuke/mininet:latest
+    container_name: amira-sdn-network
+    privileged: true
+    network_mode: host
+    volumes:
+      - ./scripts:/workspace/scripts
+      - ./network:/workspace/network
+      - ./network/results:/workspace/results
+    working_dir: /workspace
+    stdin_open: true
+    tty: true
+    depends_on:
+      - ryu-controller
+    command: >
+      bash -c "
+        apt-get update -qq &&
+        apt-get install -y -qq dnsmasq iproute2 iputils-ping iperf3 python3-pip &&
+        pip3 install -q matplotlib numpy &&
+        echo 'SDN Network Ready. Run: python3 scripts/mininet/sdn_topology.py' &&
+        tail -f /dev/null
+      "
+
+  # Ryu SDN Controller
+  ryu-controller:
+    image: osrg/ryu:latest
+    container_name: amira-ryu-controller
+    network_mode: host
+    volumes:
+      - ./scripts/ryu:/root/ryu-apps
+    working_dir: /root
+    command: >
+      bash -c "
+        echo 'Starting Ryu SDN Controller on port 6633...' &&
+        ryu-manager --observe-links /root/ryu-apps/sdn_controller.py
+      "
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/stats/switches"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Network Monitor & Analytics
+  network-monitor:
+    image: python:3.9-slim
+    container_name: amira-network-monitor
+    volumes:
+      - ./scripts:/workspace/scripts
+      - ./network:/workspace/network
+      - ./network/results:/workspace/results
+    working_dir: /workspace
+    command: >
+      bash -c "
+        pip3 install -q matplotlib numpy pandas &&
+        echo 'Network Monitor Ready' &&
+        tail -f /dev/null
+      "
+
+networks:
+  default:
+    driver: bridge
