@@ -185,10 +185,10 @@ const PHASES = [
       'Centralized ACLs replace all distributed per-switch ACLs',
     ],
     technologies: [
-      'VN_ERP → VLAN 91 (erp1: 10.3.0.10)',
-      'VN_HR_SVC → VLAN 92 (hr1: 10.3.0.20, monitor1: 10.3.0.21)',
-      'VN_IT_SVC → VLAN 93 (it1: 10.3.0.40)',
-      'VN_COLLAB → VLAN 94 (voip1: 10.3.0.50, dhcp1: 10.3.0.51)',
+      'VN_ERP → VLAN 91 (erp1: 10.3.0.1)',
+      'VN_HR_SVC → VLAN 92 (hr1: 10.3.0.17, monitor1: 10.3.0.18)',
+      'VN_IT_SVC → VLAN 93 (it1: 10.3.0.33)',
+      'VN_COLLAB → VLAN 94 (voip1: 10.3.0.49, dhcp1: 10.3.0.50)',
       'Controller-distributed OpenFlow ACL rules',
     ],
     devices: [

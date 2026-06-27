@@ -35,32 +35,32 @@ HOST_VLAN_MAP = {
 # ACL Rules - Service access permissions
 ACL_RULES = {
     'erp1': {
-        'ip': '10.3.0.10',
+        'ip': '10.3.0.1',
         'allowed_vlans': [10],
         'description': 'ERP Server - VLAN 10 only'
     },
     'hr1': {
-        'ip': '10.3.0.20',
+        'ip': '10.3.0.17',
         'allowed_vlans': [10, 20, 30, 40, 50, 60],
         'description': 'HR Server - VLANs 10-60'
     },
     'monitor1': {
-        'ip': '10.3.0.21',
+        'ip': '10.3.0.18',
         'allowed_vlans': [10, 20, 30, 40, 50, 60],
         'description': 'Monitor Server - VLANs 10-60'
     },
     'it1': {
-        'ip': '10.3.0.40',
+        'ip': '10.3.0.33',
         'allowed_vlans': [30, 40],
         'description': 'IT Server - VLANs 30,40 only'
     },
     'voip1': {
-        'ip': '10.3.0.50',
+        'ip': '10.3.0.49',
         'allowed_vlans': [10, 20, 30, 40, 50, 60],
         'description': 'VoIP Server - VLANs 10-60'
     },
     'dhcp1': {
-        'ip': '10.3.0.51',
+        'ip': '10.3.0.50',
         'allowed_vlans': [10, 20, 30, 40, 50, 60],
         'description': 'DHCP Server - VLANs 10-60'
     }

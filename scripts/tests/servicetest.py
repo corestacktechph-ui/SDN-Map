@@ -39,10 +39,10 @@ class ServiceTester:
         h1 = self.net.get('h1')
         if h1:
             # Test HTTP
-            result = h1.cmd('curl -s -o /dev/null -w "%{http_code}" --connect-timeout 3 http://10.3.0.10:80 2>/dev/null')
+            result = h1.cmd('curl -s -o /dev/null -w "%{http_code}" --connect-timeout 3 http://10.3.0.1:80 2>/dev/null')
             http_status = result.strip()
             # Test HTTPS (may not have SSL cert, so just check connection)
-            https_result = h1.cmd('timeout 3 nc -zv 10.3.0.10 443 2>&1 | grep -c succeeded')
+            https_result = h1.cmd('timeout 3 nc -zv 10.3.0.1 443 2>&1 | grep -c succeeded')
             https_ok = '1' in https_result
             
             self.results['tests']['erp_http'] = {'http_code': http_status, 'https_connection': https_ok}
@@ -53,7 +53,7 @@ class ServiceTester:
         self.log("Testing HR Server (HTTPS)...")
         h1 = self.net.get('h1')
         if h1:
-            result = h1.cmd('timeout 3 nc -zv 10.3.0.20 443 2>&1 | grep -c succeeded')
+            result = h1.cmd('timeout 3 nc -zv 10.3.0.17 443 2>&1 | grep -c succeeded')
             ok = '1' in result
             self.results['tests']['hr_https'] = {'connection': ok}
             self.log(f"  HR: HTTPS={'OK' if ok else 'FAIL'}")
@@ -63,8 +63,8 @@ class ServiceTester:
         self.log("Testing Monitor Server (HTTP/iperf3)...")
         h1 = self.net.get('h1')
         if h1:
-            http_result = h1.cmd('curl -s -o /dev/null -w "%{http_code}" --connect-timeout 3 http://10.3.0.21:80 2>/dev/null')
-            iperf_result = h1.cmd('timeout 3 nc -zv 10.3.0.21 5201 2>&1 | grep -c succeeded')
+            http_result = h1.cmd('curl -s -o /dev/null -w "%{http_code}" --connect-timeout 3 http://10.3.0.18:80 2>/dev/null')
+            iperf_result = h1.cmd('timeout 3 nc -zv 10.3.0.18 5201 2>&1 | grep -c succeeded')
             
             self.results['tests']['monitor_services'] = {
                 'http_code': http_result.strip(),
@@ -77,8 +77,8 @@ class ServiceTester:
         self.log("Testing IT Server (HTTP/SNMP)...")
         h13 = self.net.get('h13')  # VLAN 30 allowed
         if h13:
-            http_result = h13.cmd('curl -s -o /dev/null -w "%{http_code}" --connect-timeout 3 http://10.3.0.40:80 2>/dev/null')
-            snmp_result = h13.cmd('timeout 3 nc -zuv 10.3.0.40 161 2>&1 | grep -c succeeded')
+            http_result = h13.cmd('curl -s -o /dev/null -w "%{http_code}" --connect-timeout 3 http://10.3.0.33:80 2>/dev/null')
+            snmp_result = h13.cmd('timeout 3 nc -zuv 10.3.0.33 161 2>&1 | grep -c succeeded')
             
             self.results['tests']['it_services'] = {
                 'http_code': http_result.strip(),
@@ -91,7 +91,7 @@ class ServiceTester:
         self.log("Testing VoIP Server (SIP UDP 5060)...")
         h1 = self.net.get('h1')
         if h1:
-            result = h1.cmd('timeout 3 nc -zuv 10.3.0.50 5060 2>&1 | grep -c succeeded')
+            result = h1.cmd('timeout 3 nc -zuv 10.3.0.49 5060 2>&1 | grep -c succeeded')
             ok = '1' in result
             self.results['tests']['voip_sip'] = {'sip_udp': ok}
             self.log(f"  VoIP: SIP={'OK' if ok else 'FAIL'}")

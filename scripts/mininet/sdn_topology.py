@@ -239,19 +239,19 @@ def setup_host_dhcp_clients(net):
 def run_initial_diagnostics(net):
     info('*** Running baseline connectivity diagnostics...\n')
     tests = [
-        ('h1', '10.3.0.10'),   # h1 (VLAN 10) -> erp1 (should work - VLAN 10 allowed)
-        ('h1', '10.3.0.20'),   # h1 -> hr1 (should work - VLANs 10-60 allowed)
-        ('h1', '10.3.0.21'),   # h1 -> monitor1 (should work - VLANs 10-60 allowed)
-        ('h10', '10.3.0.40'),  # h10 (VLAN 20) -> it1 (should FAIL - only VLANs 30,40 allowed)
-        ('h13', '10.3.0.40'),  # h13 (VLAN 30) -> it1 (should work - VLAN 30 allowed)
-        ('h13', '10.3.0.50'),  # h13 -> voip1 (should work - VLANs 10-60 allowed)
-        ('h1', '10.3.0.51'),   # h1 -> dhcp1 (should work - VLANs 10-60 allowed)
+        ('h1', '10.3.0.1'),   # h1 (VLAN 10) -> erp1 (should work - VLAN 10 allowed)
+        ('h1', '10.3.0.17'),   # h1 -> hr1 (should work - VLANs 10-60 allowed)
+        ('h1', '10.3.0.18'),   # h1 -> monitor1 (should work - VLANs 10-60 allowed)
+        ('h10', '10.3.0.33'),  # h10 (VLAN 20) -> it1 (should FAIL - only VLANs 30,40 allowed)
+        ('h13', '10.3.0.33'),  # h13 (VLAN 30) -> it1 (should work - VLAN 30 allowed)
+        ('h13', '10.3.0.49'),  # h13 -> voip1 (should work - VLANs 10-60 allowed)
+        ('h1', '10.3.0.50'),   # h1 -> dhcp1 (should work - VLANs 10-60 allowed)
         ('h1', '10.1.3.254'),  # h1 -> Gateway VLAN 10
         ('h10', '10.1.7.254'), # h10 -> Gateway VLAN 20
         ('h13', '10.1.11.254'),# h13 -> Gateway VLAN 30
         ('h1', '198.51.100.100'),  # h1 -> Internet
         ('h7', '198.51.100.100'),  # h7 (VLAN 110 Guest) -> Internet (should work)
-        ('h7', '10.3.0.20'),   # h7 (Guest) -> hr1 (should FAIL - guests blocked from internal)
+        ('h7', '10.3.0.17'),   # h7 (Guest) -> hr1 (should FAIL - guests blocked from internal)
     ]
     for src, dst in tests:
         h = net.get(src)

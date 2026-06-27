@@ -26,37 +26,37 @@ from datetime import datetime
 # ACL Rules Configuration
 ACL_RULES = {
     'erp1': {
-        'ip': '10.3.0.10',
+        'ip': '10.3.0.1',
         'allowed_vlans': [10],
         'ports': {'tcp': [80, 443]},
         'description': 'ERP Server - VLAN 10 only'
     },
     'hr1': {
-        'ip': '10.3.0.20',
+        'ip': '10.3.0.17',
         'allowed_vlans': [10, 20, 30, 40, 50, 60],
         'ports': {'tcp': [443]},
         'description': 'HR Server - VLANs 10-60'
     },
     'monitor1': {
-        'ip': '10.3.0.21',
+        'ip': '10.3.0.18',
         'allowed_vlans': [10, 20, 30, 40, 50, 60],
         'ports': {'tcp': [80, 5201]},
         'description': 'Monitor Server - VLANs 10-60'
     },
     'it1': {
-        'ip': '10.3.0.40',
+        'ip': '10.3.0.33',
         'allowed_vlans': [30, 40],
         'ports': {'tcp': [80], 'udp': [161]},
         'description': 'IT Server - VLANs 30,40 only'
     },
     'voip1': {
-        'ip': '10.3.0.50',
+        'ip': '10.3.0.49',
         'allowed_vlans': [10, 20, 30, 40, 50, 60],
         'ports': {'udp': [5060]},
         'description': 'VoIP Server - VLANs 10-60'
     },
     'dhcp1': {
-        'ip': '10.3.0.51',
+        'ip': '10.3.0.50',
         'allowed_vlans': [10, 20, 30, 40, 50, 60],
         'ports': {'udp': [67, 68]},
         'description': 'DHCP Server - VLANs 10-60'
@@ -222,26 +222,26 @@ class NetworkValidator:
         # Test h1 (VLAN 10) can access ERP server
         h1 = self.net.get('h1')
         if h1:
-            result = h1.cmd('ping -c 2 -W 2 10.3.0.10 2>&1 | grep -oP "\\d+(?=% packet loss)"')
+            result = h1.cmd('ping -c 2 -W 2 10.3.0.1 2>&1 | grep -oP "\\d+(?=% packet loss)"')
             loss = int(result.strip()) if result.strip() else 100
             self.results['service_ports']['h1_to_erp1'] = {
                 'expected': 'PASS',
                 'result': 'PASS' if loss < 50 else 'FAIL',
                 'packet_loss': loss
             }
-            self.log(f"  h1 (VLAN 10) -> erp1 (10.3.0.10): {loss}% loss [Expected: PASS]")
+            self.log(f"  h1 (VLAN 10) -> erp1 (10.3.0.1): {loss}% loss [Expected: PASS]")
         
         # Test h13 (VLAN 30) can access IT server
         h13 = self.net.get('h13')
         if h13:
-            result = h13.cmd('ping -c 2 -W 2 10.3.0.40 2>&1 | grep -oP "\\d+(?=% packet loss)"')
+            result = h13.cmd('ping -c 2 -W 2 10.3.0.33 2>&1 | grep -oP "\\d+(?=% packet loss)"')
             loss = int(result.strip()) if result.strip() else 100
             self.results['service_ports']['h13_to_it1'] = {
                 'expected': 'PASS',
                 'result': 'PASS' if loss < 50 else 'FAIL',
                 'packet_loss': loss
             }
-            self.log(f"  h13 (VLAN 30) -> it1 (10.3.0.40): {loss}% loss [Expected: PASS]")
+            self.log(f"  h13 (VLAN 30) -> it1 (10.3.0.33): {loss}% loss [Expected: PASS]")
     
     def test_internet_connectivity(self):
         """Test internet connectivity from user and guest VLANs."""
