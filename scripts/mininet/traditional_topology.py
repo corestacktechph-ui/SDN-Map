@@ -22,10 +22,10 @@ Usage:
 import argparse
 from mininet.topo import Topo
 from mininet.net import Mininet
-from mininet.node import OVSController, OVSKernelSwitch
+from mininet.node import OVSController, OVSKernelSwitch, OVSBridge
 from mininet.cli import CLI
 from mininet.log import setLogLevel, info, error
-from mininet.link import TCLink
+from mininet.link import TCLink, Link
 import time
 import os
 from pathlib import Path
@@ -69,12 +69,12 @@ class TraditionalHierarchicalTopo(Topo):
     }
 
     SERVICE_CONFIG = {
-        'erp1':            {'vlan': 91, 'ip': '10.3.0.10/28',  'services': 'HTTP(80), HTTPS(443)', 'acl': 'VLAN 10 only'},
-        'hr1':             {'vlan': 92, 'ip': '10.3.0.20/28',  'services': 'HTTPS(443)', 'acl': 'VLANs 10-60'},
-        'monitor1':        {'vlan': 92, 'ip': '10.3.0.21/28',  'services': 'HTTP(80), iperf3(5201)', 'acl': 'VLANs 10-60'},
-        'it1':             {'vlan': 93, 'ip': '10.3.0.40/28',  'services': 'HTTP(80), SNMP(161)', 'acl': 'VLANs 30,40 only'},
-        'voip1':           {'vlan': 94, 'ip': '10.3.0.50/28',  'services': 'SIP-UDP(5060)', 'acl': 'VLANs 10-60'},
-        'dhcp1':           {'vlan': 94, 'ip': '10.3.0.51/28',  'services': 'DHCP', 'acl': 'VLANs 10-60'},
+        'erp1':            {'vlan': 91, 'ip': '10.3.0.1/28',   'services': 'HTTP(80), HTTPS(443)', 'acl': 'VLAN 10 only'},
+        'hr1':             {'vlan': 92, 'ip': '10.3.0.17/28',  'services': 'HTTPS(443)', 'acl': 'VLANs 10-60'},
+        'monitor1':        {'vlan': 92, 'ip': '10.3.0.18/28',  'services': 'HTTP(80), iperf3(5201)', 'acl': 'VLANs 10-60'},
+        'it1':             {'vlan': 93, 'ip': '10.3.0.33/28',  'services': 'HTTP(80), SNMP(161)', 'acl': 'VLANs 30,40 only'},
+        'voip1':           {'vlan': 94, 'ip': '10.3.0.49/28',  'services': 'SIP-UDP(5060)', 'acl': 'VLANs 10-60'},
+        'dhcp1':           {'vlan': 94, 'ip': '10.3.0.50/28',  'services': 'DHCP', 'acl': 'VLANs 10-60'},
     }
 
     def dpid(self, n):
@@ -84,80 +84,79 @@ class TraditionalHierarchicalTopo(Topo):
         info('*** Building Traditional Hierarchical Topology (Expanded) ***\n')
 
         # ===== Core Layer =====
-        cs1 = self.addSwitch('CS1', cls=OVSKernelSwitch, protocols='OpenFlow13', dpid=self.dpid(1))
-        cs2 = self.addSwitch('CS2', cls=OVSKernelSwitch, protocols='OpenFlow13', dpid=self.dpid(2))
-        self.addLink(cs1, cs2, bw=1000, delay='1ms')
+        cs1 = self.addSwitch('CS1', dpid=self.dpid(1))
+        cs2 = self.addSwitch('CS2', dpid=self.dpid(2))
+        self.addLink(cs1, cs2)
 
         # ===== Distribution Layer =====
-        ds_a1 = self.addSwitch('DS_A1', cls=OVSKernelSwitch, protocols='OpenFlow13', dpid=self.dpid(11))
-        ds_a2 = self.addSwitch('DS_A2', cls=OVSKernelSwitch, protocols='OpenFlow13', dpid=self.dpid(12))
-        ds_b1 = self.addSwitch('DS_B1', cls=OVSKernelSwitch, protocols='OpenFlow13', dpid=self.dpid(13))
-        ds_b2 = self.addSwitch('DS_B2', cls=OVSKernelSwitch, protocols='OpenFlow13', dpid=self.dpid(14))
-        ds_c1 = self.addSwitch('DS_C1', cls=OVSKernelSwitch, protocols='OpenFlow13', dpid=self.dpid(15))
-        ds_c2 = self.addSwitch('DS_C2', cls=OVSKernelSwitch, protocols='OpenFlow13', dpid=self.dpid(16))
-        ds_s1 = self.addSwitch('DS_S1', cls=OVSKernelSwitch, protocols='OpenFlow13', dpid=self.dpid(17))
-        ds_s2 = self.addSwitch('DS_S2', cls=OVSKernelSwitch, protocols='OpenFlow13', dpid=self.dpid(18))
+        ds_a1 = self.addSwitch('DS_A1', dpid=self.dpid(11))
+        ds_a2 = self.addSwitch('DS_A2', dpid=self.dpid(12))
+        ds_b1 = self.addSwitch('DS_B1', dpid=self.dpid(13))
+        ds_b2 = self.addSwitch('DS_B2', dpid=self.dpid(14))
+        ds_c1 = self.addSwitch('DS_C1', dpid=self.dpid(15))
+        ds_c2 = self.addSwitch('DS_C2', dpid=self.dpid(16))
+        ds_s1 = self.addSwitch('DS_S1', dpid=self.dpid(17))
+        ds_s2 = self.addSwitch('DS_S2', dpid=self.dpid(18))
 
         # ===== Access Layer =====
-        as_a1 = self.addSwitch('AS_A1', cls=OVSKernelSwitch, protocols='OpenFlow13', dpid=self.dpid(21))
-        as_b1 = self.addSwitch('AS_B1', cls=OVSKernelSwitch, protocols='OpenFlow13', dpid=self.dpid(22))
-        as_c1 = self.addSwitch('AS_C1', cls=OVSKernelSwitch, protocols='OpenFlow13', dpid=self.dpid(23))
-        as_s1 = self.addSwitch('AS_S1', cls=OVSKernelSwitch, protocols='OpenFlow13', dpid=self.dpid(24))
+        as_a1 = self.addSwitch('AS_A1', dpid=self.dpid(21))
+        as_b1 = self.addSwitch('AS_B1', dpid=self.dpid(22))
+        as_c1 = self.addSwitch('AS_C1', dpid=self.dpid(23))
+        as_s1 = self.addSwitch('AS_S1', dpid=self.dpid(24))
 
         # ===== Internet Simulation =====
-        isp_router = self.addSwitch('ISP', cls=OVSKernelSwitch, protocols='OpenFlow13', dpid=self.dpid(31))
-        edge_router = self.addSwitch('EdgeRtr', cls=OVSKernelSwitch, protocols='OpenFlow13', dpid=self.dpid(32))
+        isp_router = self.addSwitch('ISP', dpid=self.dpid(31))
+        edge_router = self.addSwitch('EdgeRtr', dpid=self.dpid(32))
 
         # ===== Core-Distribution Links (Redundant) =====
         for block_sw in [ds_a1, ds_a2, ds_b1, ds_b2, ds_c1, ds_c2, ds_s1, ds_s2]:
-            self.addLink(cs1, block_sw, bw=1000, delay='2ms')
-            self.addLink(cs2, block_sw, bw=1000, delay='2ms')
+            self.addLink(cs1, block_sw)
+            self.addLink(cs2, block_sw)
 
         # ===== Distribution Inter-Switch Links =====
         for pair in [(ds_a1, ds_a2), (ds_b1, ds_b2), (ds_c1, ds_c2), (ds_s1, ds_s2)]:
-            self.addLink(*pair, bw=1000, delay='1ms')
+            self.addLink(*pair)
 
         # ===== Cross-Block Distribution Links =====
-        self.addLink(ds_a1, ds_b1, bw=1000, delay='2ms')
-        self.addLink(ds_b1, ds_c1, bw=1000, delay='2ms')
-        self.addLink(ds_c1, ds_s1, bw=1000, delay='2ms')
+        self.addLink(ds_a1, ds_b1)
+        self.addLink(ds_b1, ds_c1)
+        self.addLink(ds_c1, ds_s1)
 
         # ===== Distribution-Access Links (Redundant) =====
-        self.addLink(ds_a1, as_a1, bw=1000, delay='5ms')
-        self.addLink(ds_a2, as_a1, bw=1000, delay='5ms')
-        self.addLink(ds_b1, as_b1, bw=1000, delay='5ms')
-        self.addLink(ds_b2, as_b1, bw=1000, delay='5ms')
-        self.addLink(ds_c1, as_c1, bw=1000, delay='5ms')
-        self.addLink(ds_c2, as_c1, bw=1000, delay='5ms')
-        self.addLink(ds_s1, as_s1, bw=1000, delay='5ms')
-        self.addLink(ds_s2, as_s1, bw=1000, delay='5ms')
+        self.addLink(ds_a1, as_a1)
+        self.addLink(ds_a2, as_a1)
+        self.addLink(ds_b1, as_b1)
+        self.addLink(ds_b2, as_b1)
+        self.addLink(ds_c1, as_c1)
+        self.addLink(ds_c2, as_c1)
+        self.addLink(ds_s1, as_s1)
+        self.addLink(ds_s2, as_s1)
 
         # ===== Internet Links =====
         inet_host = self.addHost('INET', ip='198.51.100.100/24')
-        self.addLink(inet_host, isp_router, bw=1000, delay='10ms')
-        self.addLink(isp_router, edge_router, bw=1000, delay='5ms')
-        self.addLink(cs1, edge_router, bw=1000, delay='1ms')
-        self.addLink(cs2, edge_router, bw=1000, delay='1ms')
+        self.addLink(inet_host, isp_router)
+        self.addLink(isp_router, edge_router)
+        self.addLink(cs1, edge_router)
+        self.addLink(cs2, edge_router)
 
         # ===== Service Servers =====
         for name, cfg in self.SERVICE_CONFIG.items():
             self.addHost(name, ip=cfg['ip'], defaultRoute=f'via {cfg["ip"].rsplit(".", 1)[0]}.1')
-            self.addLink(as_s1, name, bw=100, delay='1ms')
+            self.addLink(as_s1, name)
 
         # ===== Hosts (27 total across 9 VLANs) =====
-        # Host-to-Access-Switch mapping based on VLAN assignments
         host_to_access = {
-            'h1': 'AS_A1', 'h2': 'AS_A1', 'h3': 'AS_A1',        # VLAN 10 (Finance) -> Block A
-            'h4': 'AS_A1', 'h5': 'AS_A1', 'h6': 'AS_A1',        # VLAN 40 (Compliance) -> Block A
-            'h7': 'AS_A1', 'h8': 'AS_A1', 'h9': 'AS_A1',        # VLAN 110 (Guest A) -> Block A
-            'h10': 'AS_B1', 'h11': 'AS_B1', 'h12': 'AS_B1',     # VLAN 20 (HR) -> Block B
-            'h13': 'AS_B1', 'h14': 'AS_B1', 'h15': 'AS_B1',     # VLAN 30 (IT) -> Block B
-            'h16': 'AS_B1', 'h17': 'AS_B1', 'h18': 'AS_B1',     # VLAN 120 (Guest B) -> Block B
-            'h19': 'AS_C1', 'h20': 'AS_C1', 'h21': 'AS_C1',     # VLAN 50 (Corporate) -> Block C
-            'h22': 'AS_C1', 'h23': 'AS_C1', 'h24': 'AS_C1',     # VLAN 60 (Training) -> Block C
-            'h25': 'AS_C1', 'h26': 'AS_C1', 'h27': 'AS_C1',     # VLAN 130 (Guest C) -> Block C
+            'h1': 'AS_A1', 'h2': 'AS_A1', 'h3': 'AS_A1',
+            'h4': 'AS_A1', 'h5': 'AS_A1', 'h6': 'AS_A1',
+            'h7': 'AS_A1', 'h8': 'AS_A1', 'h9': 'AS_A1',
+            'h10': 'AS_B1', 'h11': 'AS_B1', 'h12': 'AS_B1',
+            'h13': 'AS_B1', 'h14': 'AS_B1', 'h15': 'AS_B1',
+            'h16': 'AS_B1', 'h17': 'AS_B1', 'h18': 'AS_B1',
+            'h19': 'AS_C1', 'h20': 'AS_C1', 'h21': 'AS_C1',
+            'h22': 'AS_C1', 'h23': 'AS_C1', 'h24': 'AS_C1',
+            'h25': 'AS_C1', 'h26': 'AS_C1', 'h27': 'AS_C1',
         }
-        
+
         for hostname, vlan in sorted(self.HOST_VLAN_MAP.items()):
             vcfg = self.VLAN_CONFIG[vlan]
             access_sw = host_to_access[hostname]
@@ -168,7 +167,7 @@ class TraditionalHierarchicalTopo(Topo):
                 pool_start = vcfg['pool'].split(',')[0]
                 h = self.addHost(hostname, ip=f'{pool_start}/22' if vlan <= 60 else f'{pool_start}/24',
                                  defaultRoute=f'via {gw}')
-            self.addLink(access_sw, h, bw=100, delay='1ms')
+            self.addLink(access_sw, h)
 
         info('*** Topology built: 27 hosts, 9 VLANs, Internet simulation, full services\n')
 
@@ -200,7 +199,7 @@ def setup_internet_routes(net):
 def setup_dhcp_server(net):
     """Configure and start DHCP server on the DHCP-Server host."""
     info('*** Setting up DHCP server...\n')
-    dhcp = net.get('DHCPSrv')
+    dhcp = net.get('dhcp1')
     if not dhcp:
         error('DHCP-Server not found\n')
         return
@@ -215,7 +214,7 @@ def setup_dhcp_server(net):
     else:
         info('*** DHCP config not found, starting minimal dnsmasq\n')
         dhcp.cmd('pkill -f dnsmasq 2>/dev/null || true')
-        dhcp.cmd('dnsmasq --interface=DHCPSrv-eth0 '
+        dhcp.cmd('dnsmasq --interface=dhcp1-eth0 '
                  '--dhcp-range=10.1.0.51,10.1.3.240,255.255.252.0,24h '
                  '--dhcp-range=10.1.4.51,10.1.7.240,255.255.252.0,24h '
                  '--dhcp-range=10.1.8.51,10.1.11.240,255.255.252.0,24h '
@@ -317,8 +316,15 @@ def run(use_dhcp=False, start_cli=True):
     """Start the traditional network simulation."""
     setLogLevel('info')
     ensure_ovs_vswitchd()
+    # Clean up any leftover OVS bridges from previous runs
+    import subprocess
+    subprocess.call('ovs-vsctl --if-exists del-br CS1 2>/dev/null; '
+                    'ovs-vsctl --if-exists del-br CS2 2>/dev/null; '
+                    'mn -c 2>/dev/null || true', shell=True,
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    time.sleep(2)
     topo = TraditionalHierarchicalTopo()
-    net = Mininet(topo=topo, switch=OVSKernelSwitch, build=True, ipBase='10.0.0.0/8', link=TCLink, controller=None)
+    net = Mininet(topo=topo, switch=OVSKernelSwitch, build=True, ipBase='10.0.0.0/8', controller=None)
     net.start()
     set_standalone_mode(net)
     info('*** Traditional Network started (Expanded Topology)\n')

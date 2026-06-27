@@ -49,22 +49,25 @@ services:
 
   # Ryu SDN Controller
   ryu-controller:
-    image: osrg/ryu:latest
+    image: python:3.9-slim
     container_name: amira-ryu-controller
     network_mode: host
     volumes:
       - ./scripts/ryu:/root/ryu-apps
-    working_dir: /root
+    working_dir: /root/ryu-apps
     command: >
       bash -c "
+        pip3 install -q 'setuptools<58' 'eventlet==0.30.2' &&
+        pip3 install -q ryu &&
         echo 'Starting Ryu SDN Controller on port 6633...' &&
-        ryu-manager --observe-links /root/ryu-apps/sdn_controller.py
+        ryu-manager --observe-links --ofp-tcp-listen-port 6633 sdn_controller.py
       "
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/stats/switches"]
-      interval: 10s
+      test: ["CMD", "python3", "-c", "import socket; s=socket.create_connection(('localhost',8080), timeout=3); s.close()"]
+      interval: 15s
       timeout: 5s
       retries: 5
+      start_period: 45s
 
   # Network Monitor & Analytics
   network-monitor:

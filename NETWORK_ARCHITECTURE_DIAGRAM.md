@@ -339,3 +339,85 @@ CS1 ◄──────OSPF Area 0──────► CS2
 **Document Version:** 1.0  
 **Last Updated:** June 25, 2026  
 **Status:** ✅ Ready for Presentation
+
+## SDN ARCHITECTURE — CONTROL AND DATA PLANE SEPARATION
+
+### Control Plane (Ryu Controller)
+
+```
+                    ┌────────────────────────────────────┐
+                    │      Application Plane             │
+                    │ QoS • ACL • VN • Monitoring        │
+                    └────────────────────────────────────┘
+                                   │
+                    ┌────────────────────────────────────┐
+                    │      Ryu SDN Controller            │
+                    │ VRF Manager • Policy Engine        │
+                    │ Path Computation • Flow Installer  │
+                    │ VN Mapper • QoS Manager            │
+                    └────────────────────────────────────┘
+                                   │
+==================== CONTROL PLANE ============================
+                                   │
+==================== DATA PLANE ===============================
+
+          SDN Fabric Core (CS1, CS2)
+               │
+        Fabric Nodes (DS_A1–DS_S2)
+               │
+        Fabric Edge Switches (AS_A1, AS_B1, AS_C1, AS_S1)
+               │
+             End Hosts
+```
+
+### VRF Segmentation
+
+| VRF | Virtual Networks | Purpose |
+|-----|-----------------|---------|
+| VRF_USERS | VN_FINANCE, VN_COMPLIANCE, VN_HR, VN_IT, VN_CORPORATE, VN_TRAINING | Isolates user traffic per department |
+| VRF_GUEST | VN_GUESTA, VN_GUESTB, VN_GUESTC | Guest internet-only access |
+| VRF_SERVICES | VN_ERP, VN_HR, VN_IT, VN_COLLAB | Critical service isolation |
+| VRF_MGMT | VN_MGMT | Management plane isolation |
+
+### VLAN-to-Virtual Network Mapping
+
+| VLAN | Purpose | Virtual Network | VRF |
+|------|---------|-----------------|-----|
+| 10 | Finance | VN_FINANCE | VRF_USERS |
+| 20 | HR | VN_HR | VRF_USERS |
+| 30 | IT | VN_IT | VRF_USERS |
+| 40 | Compliance | VN_COMPLIANCE | VRF_USERS |
+| 50 | Corporate Affairs | VN_CORPORATE | VRF_USERS |
+| 60 | Training | VN_TRAINING | VRF_USERS |
+| 91 | ERP | VN_ERP | VRF_SERVICES |
+| 92 | HR Services | VN_HR | VRF_SERVICES |
+| 93 | IT Services | VN_IT | VRF_SERVICES |
+| 94 | Collaboration | VN_COLLAB | VRF_SERVICES |
+| 110 | Guest A | VN_GUESTA | VRF_GUEST |
+| 120 | Guest B | VN_GUESTB | VRF_GUEST |
+| 130 | Guest C | VN_GUESTC | VRF_GUEST |
+| 5 | Management | VN_MGMT | VRF_MGMT |
+
+### QoS Queue Design
+
+| Queue | Priority | Traffic | Bandwidth |
+|-------|----------|---------|-----------|
+| Queue 1 | Highest | VoIP (VLAN 94) | 20% |
+| Queue 2 | High | ERP (VLAN 91) | 20% |
+| Queue 3 | Medium | HR/IT (VLAN 92, 93) | 30% |
+| Queue 4 | Normal | Users (VLAN 10-60) | 25% |
+| Queue 5 | Lowest | Guests (VLAN 110-130) | 5% |
+
+### Traffic Flow: Traditional vs SDN
+
+**Traditional:** h19 → ERP
+
+Each hop independently routes and ACL-checks:
+
+```
+h19 → AS_C1 → DS_C1 → CS1 → DS_S1 → AS_S1 → ERP
+```
+
+**SDN First Packet:** Controller computes path and installs flows end-to-end.
+
+**SDN Subsequent Packets:** Pure data-plane forwarding at wire speed — no controller involvement.

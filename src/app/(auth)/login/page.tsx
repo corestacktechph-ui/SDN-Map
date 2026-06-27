@@ -1,18 +1,24 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { Network, Eye, EyeOff, Loader2 } from 'lucide-react'
+import { useTheme } from 'next-themes'
+import { Network, Eye, EyeOff, Loader2, Sun, Moon, Activity } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 export default function LoginPage() {
   const router = useRouter()
+  const { theme, setTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => setMounted(true), [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -39,12 +45,28 @@ export default function LoginPage() {
     }
   }
 
+  if (!mounted) return null
+
+  const isDark = theme === 'dark'
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_-20%,#3b82f6_0%,transparent_50%)]" />
-        <div className="network-grid absolute inset-0 opacity-30" />
+    <div className="min-h-screen flex items-center justify-center bg-background">
+      {/* Ambient glow */}
+      <div className="pointer-events-none fixed inset-0 overflow-hidden">
+        <div className={cn(
+          'absolute -top-40 left-1/2 -translate-x-1/2 h-[500px] w-[500px] rounded-full opacity-20 blur-[120px]',
+          isDark ? 'bg-blue-600' : 'bg-blue-400'
+        )} />
+        <div className="absolute inset-0 network-grid opacity-[0.15]" />
       </div>
+
+      {/* Theme toggle */}
+      <button
+        onClick={() => setTheme(isDark ? 'light' : 'dark')}
+        className="fixed top-4 right-4 z-50 flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-card shadow-sm hover:shadow-md transition-all"
+      >
+        {isDark ? <Sun className="h-4 w-4 text-amber-500" /> : <Moon className="h-4 w-4 text-slate-600" />}
+      </button>
 
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -53,48 +75,48 @@ export default function LoginPage() {
         className="relative w-full max-w-md px-4"
       >
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-blue-500/10 border border-blue-500/20 mb-4">
-            <Network className="w-8 h-8 text-blue-500" />
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10 border border-primary/20 mb-4">
+            <Activity className="w-8 h-8 text-primary" />
           </div>
-          <h1 className="text-2xl font-bold text-white">SDN Migration Analysis</h1>
-          <p className="text-slate-400 mt-2">Sign in to your account</p>
+          <h1 className="text-2xl font-bold text-foreground">SDN Migration Analysis</h1>
+          <p className="text-muted-foreground mt-2">Sign in to your account</p>
         </div>
 
-        <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-8 backdrop-blur-xl">
+        <div className="bg-card border border-border rounded-2xl p-8 shadow-lg">
           <form onSubmit={handleSubmit} className="space-y-5">
             {error && (
-              <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-sm p-3 rounded-lg">
+              <div className="bg-destructive/10 border border-destructive/20 text-destructive text-sm p-3 rounded-lg">
                 {error}
               </div>
             )}
 
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">Email</label>
+              <label className="block text-sm font-medium text-foreground mb-2">Email</label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-2.5 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-colors"
+                className="w-full px-4 py-2.5 bg-background border border-input rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-primary transition-colors"
                 placeholder="you@example.com"
                 required
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">Password</label>
+              <label className="block text-sm font-medium text-foreground mb-2">Password</label>
               <div className="relative">
                 <input
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-colors pr-10"
+                  className="w-full px-4 py-2.5 bg-background border border-input rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-primary transition-colors pr-10"
                   placeholder="Enter your password"
                   required
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-300"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -104,7 +126,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="w-full py-2.5 bg-primary hover:bg-primary/90 text-primary-foreground font-medium rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 hover:shadow-lg hover:shadow-primary/25"
             >
               {loading ? (
                 <>
@@ -117,11 +139,11 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <div className="mt-6 pt-6 border-t border-slate-800">
-            <p className="text-xs text-slate-500 text-center">
+          <div className="mt-6 pt-6 border-t border-border">
+            <p className="text-xs text-muted-foreground text-center mb-3">
               Demo Accounts
             </p>
-            <div className="grid grid-cols-1 gap-2 mt-3">
+            <div className="grid grid-cols-1 gap-2">
               {[
                 { role: 'Admin', email: 'admin@amira-capstone.com', password: 'admin123' },
                 { role: 'Researcher', email: 'researcher@amira-capstone.com', password: 'researcher123' },
@@ -134,9 +156,9 @@ export default function LoginPage() {
                     setEmail(account.email)
                     setPassword(account.password)
                   }}
-                  className="text-xs text-left px-3 py-2 bg-slate-800/30 border border-slate-700/50 rounded-lg text-slate-400 hover:text-slate-300 hover:bg-slate-800/50 transition-colors"
+                  className="text-xs text-left px-3 py-2 bg-muted/50 border border-border rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
                 >
-                  <span className="font-medium text-slate-300">{account.role}</span>
+                  <span className="font-medium text-foreground">{account.role}</span>
                   : {account.email} / {account.password}
                 </button>
               ))}

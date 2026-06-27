@@ -19,7 +19,7 @@ describe('appStore', () => {
   })
 
   it('sets alerts', () => {
-    const alerts = [{ id: '1', title: 'Test', message: 'Test alert', severity: 'HIGH', acknowledged: false, resolved: false, createdAt: new Date().toISOString() }]
+    const alerts = [{ id: '1', title: 'Test', message: 'Test alert', severity: 'HIGH', source: null, acknowledged: false, resolved: false, createdAt: new Date().toISOString(), resolvedAt: null }]
     useAppStore.getState().setAlerts(alerts)
     expect(useAppStore.getState().alerts).toEqual(alerts)
   })

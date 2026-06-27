@@ -168,6 +168,7 @@ export default function StatisticalAnalysis() {
 
   useEffect(() => {
     runAnalysis()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const comparisonData = results.map((r) => ({

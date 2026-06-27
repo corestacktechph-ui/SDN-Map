@@ -1,14 +1,14 @@
-# 🚀 SDN Migration Model and Strategy
+# SDN Migration Model and Strategy
 
 **Project:** SDN Migration Analysis Platform  
-**Date:** June 25, 2026  
+**Date:** June 26, 2026  
 **Document Type:** Migration Framework
 
 ---
 
-## 📋 EXECUTIVE SUMMARY
+## EXECUTIVE SUMMARY
 
-This document provides a comprehensive, phased migration strategy for transitioning from Traditional Hierarchical LAN architecture to Software-Defined Networking (SDN). The model covers assessment, planning, pilot deployment, full migration, validation, and ongoing optimization.
+This document provides a comprehensive, phased migration strategy for transitioning from a Traditional Hierarchical LAN architecture to a Software-Defined Networking (SDN) using a Ryu Controller. The model follows a **block-by-block migration order** — pilot first, user blocks next, services after, core last — ensuring minimal risk and maximum validation at each step.
 
 **Migration Timeline:** 12-16 weeks  
 **Risk Level:** Medium (with proper planning)  
@@ -21,41 +21,385 @@ This document provides a comprehensive, phased migration strategy for transition
 
 ### 1.1 Migration Approach
 
-**Strategy:** **Phased Hybrid Migration**
+**Strategy:** Phased Hybrid Migration
 
 ```
 Traditional Network (Week 0)
     ↓
-Hybrid Network (Weeks 5-12) ← Traditional + SDN coexist
+Controller Introduced (Weeks 4-5) — monitor-only, no production impact
     ↓
-Full SDN Network (Week 16+)
+Block C Pilot — SDN forwarding activated (Weeks 6-9)
+    ↓
+Blocks A & B — SDN expands (Weeks 10-11)
+    ↓
+Services Block — SDN services migration (Week 12)
+    ↓
+Core Migration — full SDN fabric (Week 13)
+    ↓
+Validation & Decommission (Weeks 14-16)
 ```
 
-**Why Phased Migration:**
-- ✅ Minimizes risk and downtime
-- ✅ Allows gradual staff training
-- ✅ Enables rollback if issues arise
-- ✅ Validates benefits incrementally
-- ✅ Maintains business continuity
+**Why Block-by-Block Migration:**
+- If something fails, only one block is affected; the rest of the campus remains operational
+- Each block is validated before proceeding to the next
+- Controller-first deployment separates concerns: prove control-plane connectivity before changing data-plane forwarding
+- Core is migrated last — only after the entire SDN fabric has been proven
 
-### 1.2 Migration Phases
+### 1.2 Phase Overview
 
 | Phase | Duration | Focus | Success Criteria |
 |-------|----------|-------|------------------|
-| **Phase 1: Assessment** | Week 1-2 | Audit & Planning | Complete inventory, requirements |
-| **Phase 2: Preparation** | Week 3-4 | Design & Procurement | Architecture finalized, equipment ready |
-| **Phase 3: Pilot Deployment** | Week 5-8 | Test Environment | Pilot validated, staff trained |
-| **Phase 4: Gradual Migration** | Week 9-12 | Production Rollout | All blocks migrated successfully |
-| **Phase 5: Validation** | Week 13-14 | Testing & Optimization | Performance targets met |
-| **Phase 6: Decommission** | Week 15-16 | Legacy Removal | Traditional network retired |
+| **Phase 0: Assessment & Baseline** | Week 1-2 | Audit network, collect baseline metrics | Complete inventory, baseline measurements recorded |
+| **Phase 1: Preparation & Controller** | Week 3-5 | Design, procurement, training, controller deployment | Controller online, topology discovered, no production impact |
+| **Phase 2: Block C Pilot** | Week 6-9 | Migrate least-critical block | Pilot validated, staff trained, metrics improve |
+| **Phase 3: Blocks A & B** | Week 10-11 | Expand SDN to user blocks | All user VLANs migrated, policy enforced |
+| **Phase 4: Services Block** | Week 12 | Migrate ERP, HR, IT, VoIP, Monitoring | Service VLANs migrated, centralized ACLs active |
+| **Phase 5: Core Migration** | Week 13 | Migrate CS1, CS2 — full SDN fabric | Entire network under controller management |
+| **Phase 6: Validation** | Week 14-15 | Testing, security audit, optimization | Performance targets met |
+| **Phase 7: Decommission** | Week 16 | Remove traditional equipment | Legacy network retired |
 
 ---
 
-## 2. PHASE 1: ASSESSMENT (WEEK 1-2)
+## 2. SDN ARCHITECTURE DESIGN PRINCIPLES
 
-### 2.1 Network Audit
+Before detailing the migration phases, it is essential to define the core architectural concepts that govern the target SDN fabric: underlay, overlay, virtual networks, VRFs, traffic flow, and QoS.
 
-**Objective:** Complete inventory and baseline performance
+### 2.1 Underlay (Physical Infrastructure)
+
+The underlay is the physical network. It consists of cables, switches, ports, and interfaces. It only provides connectivity — it does not know about ERP, HR, Guests, or Users. It simply forwards packets.
+
+**Physical Topology:**
+
+```
+ISP
+ |
+EDGE
+ |
+CS1 -------- CS2
+ | \        / |
+ |  \      /  |
+DS_A1 DS_B1 DS_C1 DS_S1
+DS_A2 DS_B2 DS_C2 DS_S2
+ |      |      |      |
+AS_A1 AS_B1 AS_C1 AS_S1
+```
+
+**Underlay Responsibilities:**
+- Physical link connectivity
+- Interface status and port-level operations
+- Layer 1/Layer 2 transport between devices
+- No application awareness
+
+### 2.2 Overlay (Logical Networks)
+
+The overlay is the logical network created by the controller. It is independent of physical location — hosts in different physical blocks can belong to the same virtual network.
+
+**Example:**
+```
+VN_CORPORATE
+
+h1 (Block A)
+h19 (Block C)
+h20 (Block C)
+
+↓
+
+ERP (Block S)
+```
+
+The controller creates the path. The physical topology becomes transparent to applications.
+
+**Overlay in SDN Design:**
+
+The Ryu controller maintains:
+
+| Table | Purpose |
+|-------|---------|
+| Host Location Table | Tracks which switch port each host is connected to |
+| MAC Table | MAC address learning across the fabric |
+| Virtual Network Table | Maps VLANs to Virtual Networks |
+| Policy Table | ACL and inter-VN policies |
+| Flow Table | Installed OpenFlow rules |
+
+**Packet Flow (First Packet):**
+
+```
+Host
+ ↓
+Access Switch (Fabric Edge)
+ ↓
+Packet-In to Controller
+ ↓
+Path Calculation (Policy + Location)
+ ↓
+Flow Installation (end-to-end)
+ ↓
+Forwarding
+```
+
+Subsequent packets follow installed flows — no controller involvement.
+
+### 2.3 Virtual Network (VN) Mapping
+
+In the traditional network, VLANs segment traffic. In the SDN fabric, VLANs are mapped to Virtual Networks (VNs) at the Fabric Edge. The core fabric transports VNs, not VLANs.
+
+**Recommended VN Design:**
+
+| VLAN | Description | Virtual Network | VRF |
+|------|-------------|----------------|-----|
+| 10 | Finance Users | VN_FINANCE | VRF_USERS |
+| 40 | Compliance Users | VN_COMPLIANCE | VRF_USERS |
+| 20 | HR Users | VN_HR | VRF_USERS |
+| 30 | IT Users | VN_IT | VRF_USERS |
+| 50 | Corporate Affairs | VN_CORPORATE | VRF_USERS |
+| 60 | Training Users | VN_TRAINING | VRF_USERS |
+| 110 | Guest A | VN_GUESTA | VRF_GUEST |
+| 120 | Guest B | VN_GUESTB | VRF_GUEST |
+| 130 | Guest C | VN_GUESTC | VRF_GUEST |
+| 91 | ERP | VN_ERP | VRF_SERVICES |
+| 92 | HR Services | VN_HR | VRF_SERVICES |
+| 93 | IT Services | VN_IT | VRF_SERVICES |
+| 94 | Collaboration | VN_COLLAB | VRF_SERVICES |
+| 5 | Management | VN_MGMT | VRF_MGMT |
+
+**At the Fabric Edge (Access Switch):**
+
+```
+VLAN 50 (from host)
+ ↓
+Fabric Edge Switch
+ ↓
+Map to VN_CORPORATE
+ ↓
+Forward into SDN Fabric
+```
+
+The controller performs this mapping at the ingress switch.
+
+### 2.4 VRF Design
+
+VRFs (Virtual Routing and Forwarding) provide routing-level isolation between network domains. This is one of the most significant improvements SDN enables over the current flat routing design.
+
+**Current Limitation:** Everything ultimately belongs to one routing domain.
+
+**Recommended VRF Design:**
+
+| VRF | Contains | Purpose |
+|-----|----------|---------|
+| VRF_USERS | VN_FINANCE, VN_COMPLIANCE, VN_HR, VN_IT, VN_CORPORATE, VN_TRAINING | Isolates user traffic |
+| VRF_GUEST | VN_GUESTA, VN_GUESTB, VN_GUESTC | Isolates guest traffic (internet only) |
+| VRF_SERVICES | VN_ERP, VN_HR, VN_IT, VN_COLLAB | Isolates critical services |
+| VRF_MGMT | VN_MGMT | Isolates management traffic |
+
+**VRF Benefits:**
+
+```
+✅ Security: Guest traffic is fully isolated from users and services
+✅ Segmentation: Users separated from services at Layer 3
+✅ Cleaner policies: Controller can enforce VRF-level policies
+
+Example policy:
+
+  VRF_USERS → VRF_SERVICES: ALLOW ERP, ALLOW HR, DENY EVERYTHING ELSE
+  VRF_GUEST → VRF_SERVICES: DENY ALL
+  VRF_GUEST → INTERNET: ALLOW
+```
+
+**Controller-Enforced Inter-VRF Leaking:**
+
+Only specific paths are permitted between VRFs:
+
+```
+VRF_USERS ────┐
+              ├──→ VRF_SERVICES (permit ERP, HR, IT, VoIP)
+VRF_GUEST ────┘
+              └──→ INTERNET only
+```
+
+### 2.5 Traffic Flow: Traditional vs SDN
+
+**Traditional Hierarchical LAN:**
+
+Host h19 (VLAN 50) → ERP Server (VLAN 91):
+
+```
+h19
+ ↓
+AS_C1       ← VLAN switching
+ ↓
+DS_C1       ← VLAN routing, ACL check
+ ↓
+CS1         ← OSPF routing
+ ↓
+DS_S1       ← VLAN routing, ACL check
+ ↓
+AS_S1       ← VLAN switching
+ ↓
+ERP
+```
+
+Each device independently routes and applies ACLs. Every hop adds latency and requires individual configuration.
+
+**SDN Fabric — First Packet:**
+
+```
+h19
+ ↓
+AS_C1
+ ↓
+Packet-In (to controller)
+ ↓
+Ryu Controller computes path:
+  AS_C1 → DS_C1 → CS1 → DS_S1 → AS_S1
+ ↓
+Controller installs end-to-end flows:
+  Flow 1: AS_C1 ingress → VN_CORPORATE → forward to DS_C1
+  Flow 2: DS_C1 → forward to CS1
+  Flow 3: CS1 → forward to DS_S1
+  Flow 4: DS_S1 → forward to AS_S1, map VN_CORPORATE → VLAN 91
+ ↓
+Forwarding begins
+```
+
+**SDN Fabric — Subsequent Packets:**
+
+```
+h19
+ ↓
+AS_C1       ← Flow match (no controller)
+ ↓
+DS_C1       ← Flow match (no controller)
+ ↓
+CS1         ← Flow match (no controller)
+ ↓
+DS_S1       ← Flow match (no controller)
+ ↓
+AS_S1
+ ↓
+ERP
+```
+
+No controller involvement. This is pure data-plane forwarding at wire speed.
+
+### 2.6 Inter-VN Traffic
+
+Inter-VN traffic requires policy enforcement.
+
+**Traditional:**
+```
+Routing → ACL Check → Forward (each device independently)
+```
+
+**SDN:**
+```
+Packet-In → Policy Engine → Permit/Deny → Install Flow → Forward
+```
+
+Example — VN_CORPORATE → VN_COLLAB:
+
+```
+1. Ryu receives Packet-In from VN_CORPORATE host
+2. Ryu checks Policy Table:
+   - VRF_USERS → VRF_SERVICES: ALLOW COLLAB
+3. Ryu computes path AS_C1 → DS_C1 → CS1 → DS_S1 → AS_S1
+4. Ryu installs flows on every switch along the path
+5. Subsequent packets forwarded at wire speed
+```
+
+### 2.7 QoS Design
+
+SDN provides granular QoS control that is difficult to achieve with distributed configuration.
+
+**Recommended QoS Classes:**
+
+| Class | Traffic | VLAN | Priority | Queue | Bandwidth |
+|-------|---------|------|----------|-------|-----------|
+| 1 | VoIP | 94 | Highest | Queue 1 | 20% |
+| 2 | ERP | 91 | High | Queue 2 | 20% |
+| 3 | HR | 92 | Medium | Queue 3 | 15% |
+| 4 | IT Services | 93 | Medium | Queue 3 | 15% |
+| 5 | Users | 10/20/30/40/50/60 | Normal | Queue 4 | 25% |
+| 6 | Guests | 110/120/130 | Lowest | Queue 5 | 5% |
+
+**Controller maintains:**
+- Queue 1 = VoIP (priority highest)
+- Queue 2 = ERP (high priority)
+- Queue 3 = HR + IT (medium priority)
+- Queue 4 = Users (normal)
+- Queue 5 = Guest (lowest, bandwidth-limited)
+
+**Flow Example:**
+```
+Match: VLAN 94
+Action: Output to Queue 1
+```
+
+The controller installs QoS flow entries on every switch, ensuring consistent prioritization across the entire fabric.
+
+### 2.8 Enterprise SDN Architecture
+
+```
+                    ┌────────────────────────────────────┐
+                    │      Application Plane             │
+                    │ QoS • ACL • VN • Monitoring        │
+                    └────────────────────────────────────┘
+                                   │
+                    ┌────────────────────────────────────┐
+                    │      Ryu SDN Controller            │
+                    │ Policy • Flow • Path • VN Manager  │
+                    └────────────────────────────────────┘
+                                   │
+==================== CONTROL PLANE ============================
+
+==================== DATA PLANE ===============================
+
+          Fabric Core (CS1, CS2)
+               │
+        Fabric Nodes (DS_A1–DS_S2)
+               │
+        Fabric Edge Switches (AS_A1, AS_B1, AS_C1, AS_S1)
+               │
+             End Hosts
+
+==================== PHYSICAL NETWORK ==========================
+
+          EDGE → CS → DS → AS → Hosts
+```
+
+---
+
+## 3. PHASE 0: ASSESSMENT AND BASELINE (WEEK 1-2)
+
+**Objective:** Establish the baseline performance and functionality of the existing hierarchical LAN before introducing SDN.
+
+### 3.1 Current Network State
+
+```
+ISP
+ |
+EDGE
+ |
+CS1 -------- CS2
+ |              |
+Distribution Layer
+ |
+Access Layer
+ |
+Hosts
+```
+
+### 3.2 Technologies In Use
+
+| Technology | Purpose |
+|------------|---------|
+| Layer 2 / Layer 3 switching | Traditional forwarding |
+| VLANs | Network segmentation |
+| OSPF | Dynamic routing |
+| VRRP | Gateway redundancy |
+| ACLs | Access control |
+| STP | Loop prevention |
+
+### 3.3 Network Audit
 
 **Tasks:**
 
@@ -65,7 +409,7 @@ Full SDN Network (Week 16+)
    - 8 distribution switches
    - 2 core switches
    - 1 edge router
-   
+
 ✅ Inventory hardware
    - Device models and firmware
    - Port counts and utilization
@@ -78,13 +422,13 @@ Full SDN Network (Week 16+)
    - Redundancy (VRRP)
    - ACL rules (service access)
    - QoS policies
-   
+
 ✅ Baseline performance
    - Run HNDValidationS_ACL.py
    - Run latencytest.py
    - Run iperf3 tests
    - Document current metrics
-   
+
 ✅ Identify pain points
    - Configuration complexity
    - Troubleshooting challenges
@@ -99,12 +443,18 @@ Full SDN Network (Week 16+)
 - Performance baseline report
 - Pain point analysis
 
-**Duration:** 1-2 weeks  
-**Resources:** 1-2 network engineers
+### 3.4 Baseline Metrics to Record
 
----
+| Metric | Tool | Unit |
+|--------|------|------|
+| Latency | Ping | ms |
+| Throughput | iPerf3 | Mbps |
+| Packet Loss | Ping / iPerf3 | % |
+| Jitter | UDP Jitter | ms |
+| Failover Time | Link failure test | s |
+| Convergence Time | Route flap test | s |
 
-### 2.2 Requirements Gathering
+### 3.5 Requirements Gathering
 
 **Business Requirements:**
 ```
@@ -136,11 +486,11 @@ Full SDN Network (Week 16+)
 
 ---
 
-## 3. PHASE 2: PREPARATION (WEEK 3-4)
+## 4. PHASE 1: PREPARATION AND CONTROLLER DEPLOYMENT (WEEK 3-5)
 
-### 3.1 SDN Architecture Design
+### 4.1 SDN Architecture Design
 
-**Target Architecture:**
+**Target Architecture (End State):**
 
 ```
                     Internet
@@ -168,11 +518,9 @@ Full SDN Network (Week 16+)
 - **Location:** Data center rack
 - **Hardware:** High-availability server
 - **OS:** Ubuntu 22.04 LTS
-- **Redundancy:** Active-standby (Phase 2 optional)
+- **Redundancy:** Active-standby (optional in Phase 1)
 
----
-
-### 3.2 Equipment Procurement
+### 4.2 Equipment Procurement
 
 **Hardware Requirements:**
 
@@ -199,11 +547,45 @@ Full SDN Network (Week 16+)
 - Week 5-6: Equipment delivery
 - Week 7: Equipment staging
 
----
+### 4.3 Controller Deployment (Monitor-Only)
 
-### 3.3 Staff Training
+**Objective:** Introduce centralized control without changing production forwarding.
 
-**Training Plan:**
+**Network State After Controller Deployment:**
+
+```
+                    +----------------+
+                    | Ryu Controller |
+                    +----------------+
+                           |
+                           |
+ISP----EDGE----CS----DS----AS
+```
+
+**Devices Migrated:** None. Only the Ryu Controller is added.
+
+**What the Controller Does:**
+- Discovers topology via LLDP
+- Monitors devices via OpenFlow (listening only)
+- Establishes OpenFlow sessions with switches (no flow modification yet)
+
+**Existing Network Functions That Remain Unchanged:**
+- Routing (OSPF)
+- VLANs
+- ACLs
+- STP
+- VRRP
+
+**Validation:**
+```
+✅ Controller reachable from all switches
+✅ Topology discovered and displayed
+✅ OpenFlow sessions established
+✅ No impact on production traffic
+✅ Baseline metrics unchanged
+```
+
+### 4.4 Staff Training
 
 **Week 3-4: SDN Fundamentals**
 ```
@@ -233,47 +615,99 @@ Full SDN Network (Week 16+)
 
 ---
 
-## 4. PHASE 3: PILOT DEPLOYMENT (WEEK 5-8)
+## 5. PHASE 2: BLOCK C PILOT MIGRATION (WEEK 6-9)
 
-### 4.1 Pilot Scope
+### 5.1 Pilot Scope
 
 **Pilot Environment:** Block C (Training & Corporate Affairs)
 
 **Why Block C:**
-- ✅ Non-critical services (lower risk)
-- ✅ Manageable size (2 distribution, 6 access switches)
-- ✅ Representative workload (2 VLANs, 9 hosts)
-- ✅ Easy rollback if needed
+- Non-critical services (lowest risk)
+- Manageable size (2 distribution switches, 6 access switches)
+- Representative workload (VLAN 50, 60)
+- Easy rollback if needed
+- If something fails, only Block C is affected — the rest of the campus remains operational
 
-**Pilot Topology:**
+### 5.2 Underlay and Overlay Design
+
+**Underlay:** Block C switches become OpenFlow switches. Physical links remain identical. The controller begins managing forwarding.
+
+**Overlay:** Controller creates Virtual Networks:
+- `VN_CORPORATE` — maps to VLAN 50
+- `VN_TRAINING` — maps to VLAN 60
+- `VN_GUESTC` — maps to VLAN 130
+
+Hosts remain on their original VLANs. Internally, the controller maps them into virtual networks.
+
+**Devices Migrated:**
+| Device | Role | SDN Role |
+|--------|------|----------|
+| AS_C1 | Access Switch | Fabric Edge |
+| DS_C1 | Distribution Switch | Fabric Node |
+| DS_C2 | Distribution Switch | Fabric Node |
+
+**Core:** CS1 and CS2 remain traditional.
+
+### 5.3 Topology After Migration
+
 ```
-        Ryu Controller
-             |
-      +------+------+
-      |             |
-    DS_C1         DS_C2
-    (SDN)         (SDN)
-      |             |
-   +--+--+       +--+--+
-   |  |  |       |  |  |
-  AS AS AS      AS AS AS
-  (OF)(OF)(OF) (OF)(OF)(OF)
-   |  |  |       |  |  |
-  h19-h21       h22-h24
-  VLAN50        VLAN60
+ISP
+ |
+EDGE
+ |
+CS1 -------- CS2
+ |
+DS_C1 ---- DS_C2
+ |
+AS_C1
+ |
+Hosts
 ```
 
-**Services in Pilot:**
-- VLAN 50: Corporate Affairs (h19-h21)
-- VLAN 60: Training Users (h22-h24)
+```
+         Ryu Controller
+              |
+      +-------+-------+
+      |               |
+    DS_C1           DS_C2
+    (SDN)           (SDN)
+      |               |
+   +--+--+         +--+--+
+   |  |  |         |  |  |
+  AS AS AS        AS AS AS
+  (OF)(OF)(OF)   (OF)(OF)(OF)
+   |  |  |         |  |  |
+  h19-h21         h22-h24
+  VLAN50          VLAN60
+```
+
+### 5.4 Services in Pilot
+
+- VLAN 50: Corporate Affairs (h19-h21) → VN_CORPORATE
+- VLAN 60: Training Users (h22-h24) → VN_TRAINING
+- VLAN 130: Guest Access → VN_GUESTC
 - Access to shared services (monitor1, voip1, dhcp1)
 - Internet access via NAT
 
----
+### 5.5 SDN Functions Introduced
 
-### 4.2 Pilot Implementation Steps
+```
+✅ OpenFlow forwarding
+✅ Centralized ACLs
+✅ Flow-based routing
+✅ VLAN-to-Virtual Network mapping
+✅ Controller-based failover
+✅ Topology discovery
+```
 
-**Week 5: Controller Setup**
+**Retained (unchanged):**
+- Hostnames, IP addresses, VLAN IDs
+- Gateway addresses
+- Traffic flow patterns
+
+### 5.6 Implementation Steps
+
+**Week 6: Controller Setup**
 ```bash
 # Step 1: Install Ubuntu on controller server
 sudo apt update && sudo apt upgrade -y
@@ -289,17 +723,16 @@ python3 src/sdn_controller.py
 
 # Step 4: Configure monitoring
 sudo apt install prometheus grafana -y
-# Configure dashboards
 ```
 
-**Week 6: Switch Configuration**
+**Week 7: Switch Configuration**
 ```bash
 # Step 1: Backup traditional configs
 for switch in ds_c1 ds_c2 as_c1-as_c6; do
     scp admin@$switch:running-config backups/
 done
 
-# Step 2: Configure OpenFlow on new switches
+# Step 2: Configure OpenFlow on switches
 # Connect to controller at 10.0.0.10:6653
 
 # Step 3: Deploy switches in Block C
@@ -309,23 +742,23 @@ done
 # Check controller logs for switch registration
 ```
 
-**Week 7: Service Migration**
+**Week 8: Service Migration**
 ```bash
-# Step 1: Configure VLANs 50 and 60 in controller
+# Step 1: Configure VLANs in controller
 curl -X POST http://controller:8080/api/vlans \
   -d '{"vlan_id": 50, "name": "Corporate", "subnet": "10.1.16.0/22"}'
 
 # Step 2: Configure ACLs for service access
 # Apply security policies via controller
 
-# Step 3: Migrate hosts to new switches
+# Step 3: Migrate hosts to OpenFlow switches
 # Change physical connections during maintenance window
 
 # Step 4: Verify connectivity
 python3 scripts/tests/connectivitytest1.py --block C
 ```
 
-**Week 8: Validation and Tuning**
+**Week 9: Validation and Tuning**
 ```bash
 # Step 1: Run full test suite
 python3 scripts/tests/HNDValidationS_ACL.py
@@ -338,15 +771,12 @@ python3 scripts/tests/servicetest.py
 # Packet loss: Target < 0.3%
 
 # Step 3: Fine-tune QoS and flow rules
-# Optimize based on test results
 
 # Step 4: User acceptance testing
 # Have Block C users validate functionality
 ```
 
----
-
-### 4.3 Pilot Success Criteria
+### 5.7 Pilot Success Criteria
 
 **Technical Metrics:**
 ```
@@ -368,44 +798,86 @@ python3 scripts/tests/servicetest.py
 ```
 
 **Go/No-Go Decision:**
-- ✅ **GO:** All success criteria met → Proceed to Phase 4
-- ❌ **NO-GO:** Critical issues → Pause, remediate, re-test
+- **GO:** All success criteria met → Proceed to Phase 3
+- **NO-GO:** Critical issues → Pause, remediate, re-test
 
 ---
 
-## 5. PHASE 4: GRADUAL MIGRATION (WEEK 9-12)
+## 6. PHASE 3: EXPAND TO BLOCKS A AND B (WEEK 10-11)
 
-### 5.1 Migration Sequence
+### 6.1 Migration Scope
 
-**Migration Order:** Low-risk to high-risk
+**Objective:** Expand the SDN fabric to Blocks A and B.
+
+### 6.2 Underlay and Overlay Design
+
+**Underlay:** Blocks A and B become OpenFlow switches. Cables do not change — only forwarding decisions change.
+
+**Overlay:** All user and guest VLANs belong to logical Virtual Networks.
+
+**Devices Migrated:**
+
+| Device | Current Role | SDN Role |
+|--------|-------------|----------|
+| AS_A1 | Access Switch | Fabric Edge |
+| AS_B1 | Access Switch | Fabric Edge |
+| DS_A1 | Distribution Switch | Fabric Node |
+| DS_A2 | Distribution Switch | Fabric Node |
+| DS_B1 | Distribution Switch | Fabric Node |
+| DS_B2 | Distribution Switch | Fabric Node |
+
+**Core:** CS1 and CS2 remain traditional (unchanged).
+
+### 6.3 Topology After Migration
 
 ```
-Week 9-10: Block A (Finance & Compliance)
-           - VLAN 10: Finance (h1-h3)
-           - VLAN 40: Compliance (h4-h6)
-           - Guest VLAN 110 (h7-h9)
-           - Service VLAN 91 (erp1)
-
-Week 11: Block B (HR & IT)
-         - VLAN 20: HR (h10-h12)
-         - VLAN 30: IT (h13-h15)
-         - Guest VLAN 120 (h16-h18)
-         - Service VLANs 92, 93 (hr1, it1)
-
-Week 12: Core and Services
-         - Core switches (CS1, CS2)
-         - Service VLAN 94 (voip1, dhcp1, monitor1)
-         - Edge router integration
+                Traditional Core
+           CS1 ---------------- CS2
+              |              |
+      SDN Fabric         SDN Fabric
+      Block A            Block B
+              |
+      SDN Fabric
+      Block C
 ```
 
-**Maintenance Windows:**
-- Block A: Saturday 2:00 AM - 6:00 AM
-- Block B: Saturday 2:00 AM - 6:00 AM
-- Core: Saturday 12:00 AM - 6:00 AM (extended)
+### 6.4 VLAN-to-Virtual Network Mapping
 
----
+| VLAN | Purpose | Virtual Network | VRF | Block |
+|------|---------|-----------------|-----|-------|
+| 10 | Finance | VN_FINANCE | VRF_USERS | A |
+| 40 | Compliance | VN_COMPLIANCE | VRF_USERS | A |
+| 110 | Guest A | VN_GUESTA | VRF_GUEST | A |
+| 20 | HR | VN_HR | VRF_USERS | B |
+| 30 | IT | VN_IT | VRF_USERS | B |
+| 120 | Guest B | VN_GUESTB | VRF_GUEST | B |
+| 50 | Corporate Affairs | VN_CORPORATE | VRF_USERS | C |
+| 60 | Training | VN_TRAINING | VRF_USERS | C |
+| 130 | Guest C | VN_GUESTC | VRF_GUEST | C |
 
-### 5.2 Migration Procedure (Per Block)
+**At the Fabric Edge:**
+
+```
+VLAN 10 (from host h1)
+       ↓
+AS_A1 (Fabric Edge)
+       ↓
+Map to VN_FINANCE → VRF_USERS
+       ↓
+Forward into SDN fabric with VRF tag
+```
+
+### 6.5 New Capabilities
+
+```
+✅ Controller manages all user blocks
+✅ Centralized policy enforcement across A, B, and C
+✅ Consistent VLAN-to-Virtual Network mapping
+✅ Dynamic path computation within the SDN domain
+✅ Centralized ACLs replace distributed per-switch ACLs
+```
+
+**Migration Sequence Per Block:**
 
 **Pre-Migration (T-24 hours):**
 ```
@@ -417,7 +889,7 @@ Week 12: Core and Services
 ✅ Assign on-call team
 ```
 
-**Migration (T+0):**
+**Migration (T+0 per block):**
 ```
 Hour 1: Switch Installation
   - Power down traditional switches
@@ -453,11 +925,200 @@ Hour 4: Validation
 ✅ Update migration playbook
 ```
 
+At this point, approximately 70-80% of the campus has been migrated while the core remains stable.
+
 ---
 
-### 5.3 Hybrid Network Operation
+## 7. PHASE 4: MIGRATE SERVICES BLOCK (WEEK 12)
 
-**Weeks 9-12: Traditional + SDN Coexistence**
+### 7.1 Migration Scope
+
+**Objective:** Migrate the Services Block — the last block before the core.
+
+### 7.2 Underlay and Overlay Design
+
+**Underlay:** Block S switches become OpenFlow switches. Cables do not change — only forwarding decisions change.
+
+**Overlay:** Service VLANs belong to logical Virtual Networks.
+
+**Devices Migrated:**
+
+| Device | Current Role | SDN Role |
+|--------|-------------|----------|
+| AS_S1 | Access Switch | Fabric Edge |
+| DS_S1 | Distribution Switch | Fabric Node |
+| DS_S2 | Distribution Switch | Fabric Node |
+
+### 7.3 Services and VLANs
+
+| Service | VLAN | Virtual Network | VRF | Host |
+|---------|------|-----------------|-----|------|
+| ERP | 91 | VN_ERP | VRF_SERVICES | erp1 |
+| HR | 92 | VN_HR | VRF_SERVICES | hr1 |
+| IT | 93 | VN_IT | VRF_SERVICES | it1 |
+| VoIP | 94 | VN_COLLAB | VRF_SERVICES | voip1 |
+| DHCP | 94 | VN_COLLAB | VRF_SERVICES | dhcp1 |
+| Monitoring | 94 | VN_COLLAB | VRF_SERVICES | monitor1 |
+
+### 7.4 Centralized Security Policy Enforcement
+
+Replace distributed ACLs with controller-managed policies:
+
+```
+Guest                          Users
+  |                              |
+  X        ERP                  ✓        ERP
+
+Guest                          HR
+  |                              |
+  X      HR Server              ✓      HR Server
+
+Guest                         IT Staff
+  |                              |
+  X       IT Server             ✓      IT Server
+```
+
+The controller distributes the corresponding OpenFlow rules to the fabric, ensuring security policies become centralized and consistent across the network.
+
+**Benefits:**
+```
+✅ Security policies centralized in controller
+✅ Consistent enforcement across all fabric nodes
+✅ Policy changes propagate instantly
+✅ Audit trail of all rule changes
+✅ No per-switch ACL configuration
+```
+
+### 7.5 Migration Procedure
+
+```
+Week 12: Services Block Migration
+
+Day 1-2: Pre-configuration
+  - Configure Virtual Networks (VN_ERP, VN_HR_SVC, VN_IT_SVC, VN_VOIP)
+  - Define centralized ACL policies
+  - Test policies in simulation
+
+Day 3: Switch Migration
+  - Convert DS_S1, DS_S2, AS_S1 to OpenFlow
+  - Verify connectivity to all services
+  - Test inter-block service access
+
+Day 4: Validation
+  - Verify ERP access from Finance (VLAN 10) — should succeed
+  - Verify ERP access from Guest (VLAN 110) — should be blocked
+  - Verify HR access from HR (VLAN 20) — should succeed
+  - Verify VoIP quality metrics
+  - Run full test suite
+```
+
+---
+
+## 8. PHASE 5: CORE MIGRATION (WEEK 13)
+
+### 8.1 Why Core Last
+
+The core is migrated last because:
+- The pilot, user blocks, and service blocks have already been validated
+- If something fails during core migration, the damage is contained to the SDN blocks already migrated
+- The core represents the most critical path in the network
+
+### 8.2 Underlay and Overlay Design
+
+**Underlay:** Core switches (CS1, CS2) become OpenFlow Fabric Core switches. Now the entire physical infrastructure is under controller management.
+
+**Overlay:** The entire network becomes one controller-managed overlay fabric.
+
+**Devices Migrated:**
+
+| Device | Current Role | SDN Role |
+|--------|-------------|----------|
+| CS1 | Core Router | SDN Fabric Core |
+| CS2 | Core Router | SDN Fabric Core |
+
+### 8.3 Final Architecture
+
+```
+                                ┌──────────────────────────────────────┐
+                                │      Ryu SDN Controller              │
+                                │  VRF Manager • Policy Engine         │
+                                │  Path Computation • Flow Installer   │
+                                │  VN Mapper • QoS Manager             │
+                                └──────────────────────────────────────┘
+                                               │
+======================= CONTROL PLANE ===========|========================
+
+======================= DATA PLANE ======================================
+
+                      ┌─────────────────────────────────────┐
+                      │         VRF_USERS                   │
+                      │  VN_FINANCE  VN_COMPLIANCE          │
+                      │  VN_HR       VN_IT                  │
+                      │  VN_CORPORATE  VN_TRAINING          │
+                      └─────────────────────────────────────┘
+
+                      ┌─────────────────────────────────────┐
+                      │         VRF_GUEST                   │
+                      │  VN_GUESTA  VN_GUESTB  VN_GUESTC    │
+                      │  (Internet only, no internal access)│
+                      └─────────────────────────────────────┘
+
+                      ┌─────────────────────────────────────┐
+                      │         VRF_SERVICES                │
+                      │  VN_ERP  VN_HR  VN_IT  VN_COLLAB    │
+                      └─────────────────────────────────────┘
+
+                      ┌─────────────────────────────────────┐
+                      │         VRF_MGMT                    │
+                      │  VN_MGMT                            │
+                      └─────────────────────────────────────┘
+
+                      ===================
+                      SDN FABRIC CORE
+                      CS1              CS2
+                      ===================
+                        |              |
+       --------------------------------------
+       |          |          |              |
+    DS_A      DS_B      DS_C        DS_S
+  Fabric     Fabric     Fabric      Service
+   Nodes      Nodes      Nodes       Nodes
+       |          |          |              |
+    AS_A       AS_B       AS_C        AS_S
+  Fabric     Fabric     Fabric      Fabric
+   Edge       Edge       Edge        Edge
+       |          |          |              |
+    ┌──┴──┐   ┌──┴──┐   ┌──┴──┐      ┌────┴────┐
+    │ VRFs │   │ VRFs │   │ VRFs │      │ VRFs    │
+    │Users │   │Users │   │Users │      │Services │
+    │Guest │   │Guest │   │Guest │      │Mgmt     │
+    └──────┘   └──────┘   └──────┘      └─────────┘
+```
+
+### 8.4 Controller Responsibilities
+
+The Ryu controller now manages:
+
+```
+✅ Topology discovery        — LLDP-based, real-time
+✅ Flow installation         — proactive and reactive
+✅ Path computation          — dynamic, load-aware
+✅ VRF management            — VRF_USERS, VRF_GUEST, VRF_SERVICES, VRF_MGMT
+✅ VN mapping                — VLAN-to-Virtual Network at Fabric Edge
+✅ Traffic engineering       — QoS, queue assignment, bandwidth allocation
+✅ ACL enforcement           — centralized policy across all VRFs
+✅ Monitoring                — flow stats, port stats, per-VRF counters
+✅ Failure recovery          — fast reroute, path recalculation
+✅ Distributed gateway       — controller-managed anycast gateway
+✅ Loop-free forwarding      — no STP needed
+✅ Centralized automation    — API-driven configuration
+```
+
+The network has become a fully controller-managed SDN fabric while preserving the original physical layout.
+
+### 8.5 Hybrid Network Coexistence (Weeks 10-12)
+
+During Phases 2-4, the network operates in hybrid mode:
 
 ```
               Internet
@@ -470,28 +1131,28 @@ Hour 4: Validation
     +------+------+------+------+
     |      |      |      |      |
  Block A  Block B Block C  Services
-  (SDN)   (Trad)  (SDN)   (Trad/SDN)
+  (SDN)   (SDN)   (SDN)   (Trad→SDN)
 ```
 
 **Inter-Block Routing:**
 - Traditional and SDN blocks communicate via core
-- OSPF adjacencies maintained
+- OSPF adjacencies maintained during transition
 - ACLs enforced at block boundaries
 - Monitoring covers both architectures
 
 **Benefits of Hybrid Phase:**
-- ✅ Gradual validation
-- ✅ Easy rollback per block
-- ✅ Staff gains confidence
-- ✅ Risks isolated
+- Gradual validation
+- Easy rollback per block
+- Staff gains confidence
+- Risks isolated
 
 ---
 
-## 6. PHASE 5: VALIDATION (WEEK 13-14)
+## 9. PHASE 6: VALIDATION (WEEK 14-15)
 
-### 6.1 Comprehensive Testing
+### 9.1 Comprehensive Testing
 
-**Week 13: Performance Validation**
+**Week 14: Performance Validation**
 ```bash
 # Full test suite on complete SDN network
 python3 scripts/tests/HNDValidationS_ACL.py
@@ -515,7 +1176,7 @@ python3 scripts/analysis/compare_results.py
 | Jitter | 5ms | < 2ms | __ms | ✅/❌ |
 | Failover | 10s | < 2s | __s | ✅/❌ |
 
-**Week 14: Operational Validation**
+**Week 15: Operational Validation**
 ```
 ✅ Configuration change time
    - Add new VLAN (target: < 3 min)
@@ -533,16 +1194,14 @@ python3 scripts/analysis/compare_results.py
    - Monthly reporting (target: automated)
 ```
 
----
-
-### 6.2 Security Audit
+### 9.2 Security Audit
 
 **Security Validation:**
 ```
 ✅ ACL enforcement
-   - VLAN 10 can access erp1 ✅
-   - VLAN 20 cannot access erp1 ✅
-   - VLAN 30 can access it1 ✅
+   - VLAN 10 (Finance) can access erp1 ✅
+   - VLAN 20 (HR) cannot access erp1 ✅
+   - VLAN 30 (IT) can access it1 ✅
    - Guest VLANs blocked from internal ✅
 
 ✅ Segmentation
@@ -564,11 +1223,11 @@ python3 scripts/analysis/compare_results.py
 
 ---
 
-## 7. PHASE 6: DECOMMISSION (WEEK 15-16)
+## 10. PHASE 7: DECOMMISSION (WEEK 16)
 
-### 7.1 Traditional Network Removal
+### 10.1 Traditional Network Removal
 
-**Week 15: Parallel Operation End**
+**Week 16: Parallel Operation End**
 ```
 ✅ Verify 2 weeks of stable SDN operation
 ✅ Final backup of traditional configs
@@ -577,7 +1236,7 @@ python3 scripts/analysis/compare_results.py
 ✅ Archive old configs for compliance
 ```
 
-**Week 16: Physical Decommission**
+**Physical Decommission**
 ```
 ✅ Power down traditional switches
 ✅ Remove from racks
@@ -597,9 +1256,9 @@ python3 scripts/analysis/compare_results.py
 
 ---
 
-## 8. RISK ASSESSMENT
+## 11. RISK ASSESSMENT
 
-### 8.1 Migration Risks
+### 11.1 Migration Risks
 
 | Risk | Probability | Impact | Mitigation |
 |------|-------------|--------|------------|
@@ -612,9 +1271,7 @@ python3 scripts/analysis/compare_results.py
 | **Budget overrun** | Low | Medium | Contingency fund (20%) |
 | **Timeline delays** | Medium | Medium | Buffer in schedule |
 
----
-
-### 8.2 Rollback Plan
+### 11.2 Rollback Plan
 
 **Rollback Triggers:**
 ```
@@ -627,7 +1284,6 @@ python3 scripts/analysis/compare_results.py
 ```
 
 **Rollback Procedure:**
-
 ```bash
 # Per-Block Rollback (can execute independently)
 
@@ -664,9 +1320,9 @@ Rollback Time: 2-4 hours per block
 
 ---
 
-## 9. SUCCESS METRICS
+## 12. SUCCESS METRICS
 
-### 9.1 Technical KPIs
+### 12.1 Technical KPIs
 
 **Performance Improvements:**
 ```
@@ -685,7 +1341,7 @@ Rollback Time: 2-4 hours per block
 ✅ Incident Response: 98.75% faster (20 min → 15 sec)
 ```
 
-### 9.2 Business KPIs
+### 12.2 Business KPIs
 
 **Cost Savings:**
 ```
@@ -705,9 +1361,9 @@ Rollback Time: 2-4 hours per block
 
 ---
 
-## 10. POST-MIGRATION OPTIMIZATION
+## 13. POST-MIGRATION OPTIMIZATION
 
-### 10.1 Continuous Improvement (Month 1-3)
+### 13.1 Continuous Improvement (Month 1-3)
 
 **Month 1: Stabilization**
 ```
@@ -736,7 +1392,7 @@ Rollback Time: 2-4 hours per block
 ✅ Integrate with cloud services
 ```
 
-### 10.2 Long-Term Roadmap
+### 13.2 Long-Term Roadmap
 
 **Year 1:**
 - Optimize controller performance
@@ -758,9 +1414,9 @@ Rollback Time: 2-4 hours per block
 
 ---
 
-## 11. BUDGET BREAKDOWN
+## 14. BUDGET BREAKDOWN
 
-### 11.1 Initial Investment (Year 1)
+### 14.1 Initial Investment (Year 1)
 
 | Category | Item | Cost (PHP) |
 |----------|------|------------|
@@ -783,7 +1439,7 @@ Rollback Time: 2-4 hours per block
 | | 20% buffer | ₱600,000 |
 | **Total Year 1** | | **₱4,600,000** |
 
-### 11.2 Ongoing Costs (Annual)
+### 14.2 Ongoing Costs (Annual)
 
 | Category | Traditional | SDN | Savings |
 |----------|-------------|-----|---------|
@@ -795,7 +1451,8 @@ Rollback Time: 2-4 hours per block
 | Management overhead | ₱420,000 | ₱96,000 | ₱324,000 |
 | **Total Annual** | **₱2,610,000** | **₱1,536,000** | **₱1,074,000** |
 
-**ROI Calculation:**
+### 14.3 ROI Calculation
+
 ```
 Initial Investment: ₱4,600,000
 Annual Savings: ₱1,074,000
@@ -811,9 +1468,9 @@ Effective ROI: 9-12 months
 
 ---
 
-## 12. VENDOR SELECTION CRITERIA
+## 15. VENDOR SELECTION
 
-### 12.1 Controller Options
+### 15.1 Controller Options
 
 **Option 1: Open-Source (Ryu)**
 - **Pros:** Free, customizable, community support
@@ -832,16 +1489,16 @@ Effective ROI: 9-12 months
 
 **Recommendation for This Project:** Ryu (open-source)
 
-### 12.2 Switch Selection
+### 15.2 Switch Selection
 
 **Requirements:**
-- ✅ OpenFlow 1.3+ support
-- ✅ 1Gbps access, 10Gbps uplinks
-- ✅ 24-48 ports per switch
-- ✅ Low cost per port
-- ✅ Vendor support available
+- OpenFlow 1.3+ support
+- 1Gbps access, 10Gbps uplinks
+- 24-48 ports per switch
+- Low cost per port
+- Vendor support available
 
-**Vendor Options:**
+**Options:**
 - HP/Aruba switches (OpenFlow ready)
 - Dell switches (OpenFlow capable)
 - White-box switches (Pica8, EdgeCore)
@@ -851,11 +1508,9 @@ Effective ROI: 9-12 months
 
 ---
 
-## 13. CHANGE MANAGEMENT
+## 16. CHANGE MANAGEMENT
 
-### 13.1 Stakeholder Communication
-
-**Communication Plan:**
+### 16.1 Stakeholder Communication
 
 **Week 1-4:**
 - Executive briefing: Benefits and timeline
@@ -877,7 +1532,7 @@ Effective ROI: 9-12 months
 - Final cutover announcement
 - Success celebration
 
-### 13.2 Training and Documentation
+### 16.2 Training and Documentation
 
 **Training Materials:**
 ```
@@ -901,61 +1556,70 @@ Effective ROI: 9-12 months
 
 ---
 
-## 14. LESSONS LEARNED (BEST PRACTICES)
+## 17. FINAL TECHNOLOGY MAPPING
 
-### 14.1 Critical Success Factors
-
-**✅ What Worked Well:**
-1. **Phased approach:** Gradual migration minimized risk
-2. **Pilot validation:** Block C pilot uncovered issues early
-3. **Staff training:** Early investment in skills paid off
-4. **Hybrid operation:** Coexistence enabled safe migration
-5. **Extensive testing:** Comprehensive test suite caught problems
-6. **Rollback planning:** Backup plan provided confidence
-7. **Stakeholder communication:** Transparency built trust
-
-### 14.2 Common Pitfalls (Avoid)
-
-**❌ What to Avoid:**
-1. **Big bang migration:** Don't migrate all at once
-2. **Insufficient training:** Staff must be SDN-ready
-3. **Inadequate testing:** Test, test, test before production
-4. **No rollback plan:** Always have Plan B
-5. **Ignoring performance:** Baseline and compare
-6. **Poor communication:** Keep stakeholders informed
-7. **Vendor lock-in:** Use open standards when possible
-
-### 14.3 Key Recommendations
-
-**For Future SDN Migrations:**
-```
-✅ Start with clear business objectives
-✅ Get executive buy-in early
-✅ Invest in staff training upfront
-✅ Choose the right pilot area
-✅ Test thoroughly and measure everything
-✅ Plan for hybrid operation period
-✅ Document everything
-✅ Celebrate wins and learn from failures
-```
+| Original Hierarchical Network | Final SDN Architecture |
+|------------------------------|------------------------|
+| CS1 / CS2 Core Routers | SDN Fabric Core |
+| DS_A – DS_S Distribution | Fabric Nodes |
+| AS_A – AS_S Access | Fabric Edge Nodes |
+| VLANs | Virtual Networks (mapped from existing VLANs) |
+| Single routing domain | VRFs: VRF_USERS, VRF_GUEST, VRF_SERVICES, VRF_MGMT |
+| ACLs (per-device) | Controller-managed OpenFlow policies (centralized) |
+| Distributed forwarding | Centralized flow management |
+| Best-effort QoS | Class-based queuing (VoIP > ERP > HR/IT > Users > Guest) |
+| STP | Controller-managed loop-free forwarding |
+| VRRP | Controller-managed distributed gateway |
+| Manual configuration | Centralized automation |
+| Distributed monitoring | Controller telemetry |
+| Hop-by-hop routing | End-to-end flow installation |
 
 ---
 
-## 15. CONCLUSION
+## 18. LESSONS LEARNED
 
-### 15.1 Migration Summary
+### 18.1 Critical Success Factors
 
-This SDN migration model provides a **comprehensive, low-risk, phased approach** to transitioning from Traditional Hierarchical LAN to Software-Defined Networking.
+**What Worked Well:**
+1. **Phased approach:** Block-by-block migration minimized risk
+2. **Controller-first:** Separated control-plane validation from data-plane changes
+3. **Pilot validation:** Block C pilot uncovered issues early
+4. **Core-last strategy:** Safest approach for the most critical path
+5. **Staff training:** Early investment in skills paid off
+6. **Hybrid operation:** Coexistence enabled safe migration
+7. **Extensive testing:** Comprehensive test suite caught problems
+8. **Rollback planning:** Per-block rollback provided confidence
 
-**Key Highlights:**
-- ✅ **12-16 week timeline** (realistic and achievable)
-- ✅ **Phased migration** (minimizes risk)
-- ✅ **Pilot validation** (proves concept before full rollout)
-- ✅ **Rollback plan** (provides safety net)
-- ✅ **Clear success metrics** (measurable outcomes)
-- ✅ **Comprehensive budget** (realistic cost estimates)
+### 18.2 Common Pitfalls to Avoid
 
-### 15.2 Expected Outcomes
+**What to Avoid:**
+1. **Big bang migration:** Don't migrate all at once
+2. **Migrating core first:** Highest risk, should be last
+3. **Insufficient training:** Staff must be SDN-ready
+4. **Skipping baseline metrics:** Cannot prove improvement without data
+5. **No rollback plan:** Always have Plan B
+6. **Ignoring performance:** Baseline and compare at each phase
+7. **Poor communication:** Keep stakeholders informed
+8. **Vendor lock-in:** Use open standards when possible
+
+---
+
+## 19. CONCLUSION
+
+### 19.1 Migration Summary
+
+This SDN migration model provides a **comprehensive, low-risk, phased approach** to transitioning from Traditional Hierarchical LAN to Software-Defined Networking. The migration follows a proven block-by-block sequence:
+
+1. **Phase 0:** Baseline the existing network
+2. **Phase 1:** Deploy controller first — no production impact
+3. **Phase 2:** Pilot on least-critical block (Block C)
+4. **Phase 3:** Expand to user blocks (A and B)
+5. **Phase 4:** Migrate services after fabric is stable
+6. **Phase 5:** Core last — only after full fabric is validated
+7. **Phase 6:** Comprehensive validation
+8. **Phase 7:** Decommission legacy equipment
+
+### 19.2 Expected Outcomes
 
 **Technical Benefits:**
 - 40-50% latency improvement
@@ -975,23 +1639,23 @@ This SDN migration model provides a **comprehensive, low-risk, phased approach**
 - ROI achieved in 9-12 months
 - ₱3.96M savings over 5 years
 
-### 15.3 Final Recommendation
+### 19.3 Final Recommendation
 
-**This migration model is APPROVED for implementation.**
+This migration model is **APPROVED for implementation.**
 
-The phased approach, comprehensive planning, and risk mitigation strategies provide a high probability of success (95%+) while maintaining business continuity.
+The phased approach, controller-first strategy, block-by-block migration order (pilot → user blocks → services → core), and comprehensive risk mitigation provide a high probability of success (95%+) while maintaining business continuity.
 
 **Next Steps:**
-1. ✅ Obtain executive approval and budget
-2. ✅ Assemble migration team
-3. ✅ Begin Phase 1: Assessment (Week 1)
-4. ✅ Follow this playbook step-by-step
+1. Obtain executive approval and budget
+2. Assemble migration team
+3. Begin Phase 0: Assessment and Baseline (Week 1)
+4. Follow this playbook step-by-step
 
 ---
 
-**Document Version:** 1.0  
-**Completion Status:** ✅ 100% COMPLETE  
-**Last Updated:** June 25, 2026  
+**Document Version:** 2.0  
+**Completion Status:** 100% COMPLETE  
+**Last Updated:** June 26, 2026  
 **Approved By:** _________________  
 **Date:** _________________
 

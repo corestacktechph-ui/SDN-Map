@@ -23,7 +23,8 @@ interface TestResult {
 
 const testTypes = [
   { id: 'ping', name: 'Ping Test', description: 'Measure ICMP latency and packet loss', icon: Activity, color: 'blue' },
-  { id: 'throughput', name: 'Throughput Test', description: 'Measure TCP/UDP bandwidth using iPerf3', icon: Gauge, color: 'purple' },
+  { id: 'throughput-tcp', name: 'TCP Throughput', description: 'Measure TCP bandwidth using iPerf3 (configurable duration)', icon: Gauge, color: 'purple' },
+  { id: 'throughput-udp', name: 'UDP Throughput', description: 'Measure UDP bandwidth with target rate and duration', icon: Gauge, color: 'violet' },
   { id: 'jitter', name: 'UDP Jitter Test', description: 'Measure jitter and packet loss variation', icon: Waves, color: 'emerald' },
   { id: 'failover', name: 'Failover Test', description: 'Measure convergence time after link failure', icon: Shield, color: 'amber' },
 ]
@@ -185,6 +186,18 @@ export default function TestingPage() {
               <label className="block text-sm font-medium mb-1.5">Duration (seconds)</label>
               <input type="number" defaultValue={10} className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" />
             </div>
+            {selectedTest === 'throughput-udp' && (
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Target Bandwidth (Mbps)</label>
+                <input type="number" defaultValue={50} placeholder="e.g. 50" className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" />
+                <p className="text-[10px] text-muted-foreground mt-1">UDP target rate for iPerf3 (-b flag)</p>
+              </div>
+            )}
+            {selectedTest === 'throughput-tcp' && (
+              <div className="rounded-lg border border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950 p-2">
+                <p className="text-[10px] text-blue-700 dark:text-blue-300">TCP test runs for the specified duration. iPerf3 will maximize throughput automatically.</p>
+              </div>
+            )}
           </CardContent>
         </Card>
 

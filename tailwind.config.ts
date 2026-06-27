@@ -66,6 +66,7 @@ const config: Config = {
           DEFAULT: 'hsl(var(--sidebar-background))',
           foreground: 'hsl(var(--sidebar-foreground))',
           muted: 'hsl(var(--sidebar-muted))',
+          'muted-foreground': 'hsl(var(--sidebar-muted-foreground))',
           accent: 'hsl(var(--sidebar-accent))',
         },
         network: {

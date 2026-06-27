@@ -414,6 +414,7 @@ export default function NetworkTopologyVisualization({ type, liveUpdate = false 
         avgLatency: 18.5,
       })
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [type])
 
   useEffect(() => {

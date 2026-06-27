@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import {
   Activity,
@@ -22,6 +23,9 @@ import { useTests } from '@/hooks'
 import { useController } from '@/hooks'
 
 export default function DashboardPage() {
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
+
   const { data: stats, isLoading: statsLoading } = useMonitoringStats()
   const { data: tests } = useTests()
   const { data: controller } = useController()
@@ -119,10 +123,17 @@ export default function DashboardPage() {
           <CardContent>
             <div className="flex items-center justify-center py-8">
               <div className="relative flex h-40 w-40 items-center justify-center">
-                <svg className="h-full w-full -rotate-90" viewBox="0 0 100 100">
-                  <circle cx="50" cy="50" r="42" fill="none" stroke="currentColor" strokeWidth="8" className="text-muted" opacity={0.2} />
-                  <circle cx="50" cy="50" r="42" fill="none" stroke="currentColor" strokeWidth="8" className="text-blue-500" strokeDasharray={`${healthScore * 2.64} ${100 * 2.64}`} strokeLinecap="round" />
-                </svg>
+                {mounted ? (
+                  <svg className="h-full w-full -rotate-90" viewBox="0 0 100 100">
+                    <circle cx="50" cy="50" r="42" fill="none" stroke="currentColor" strokeWidth="8" className="text-muted" opacity={0.2} />
+                    <circle cx="50" cy="50" r="42" fill="none" stroke="currentColor" strokeWidth="8" className="text-blue-500" strokeDasharray={`${healthScore * 2.64} ${100 * 2.64}`} strokeLinecap="round" />
+                  </svg>
+                ) : (
+                  <svg className="h-full w-full -rotate-90" viewBox="0 0 100 100">
+                    <circle cx="50" cy="50" r="42" fill="none" stroke="currentColor" strokeWidth="8" className="text-muted" opacity={0.2} />
+                    <circle cx="50" cy="50" r="42" fill="none" stroke="currentColor" strokeWidth="8" className="text-muted" opacity={0.2} />
+                  </svg>
+                )}
                 <div className="absolute flex flex-col items-center">
                   <span className="text-3xl font-bold">{healthScore || '—'}</span>
                   <span className="text-xs text-muted-foreground">/ 100</span>

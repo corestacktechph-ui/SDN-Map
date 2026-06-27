@@ -3,6 +3,7 @@
 import { useSession } from 'next-auth/react'
 import { Activity } from 'lucide-react'
 import { NotificationDropdown } from '@/components/notifications/NotificationDropdown'
+import { ThemeToggle } from '@/components/ui/theme-toggle'
 import { useAppStore } from '@/store/appStore'
 
 export function TopBar() {
@@ -20,7 +21,8 @@ export function TopBar() {
 
       <div className="flex-1" />
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-1">
+        <ThemeToggle />
         <NotificationDropdown />
 
         <div className="flex items-center gap-3 border-l pl-3">
