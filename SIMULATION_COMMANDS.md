@@ -159,7 +159,93 @@ sudo python3 /tmp/failover_testing.py --mode sdn
 
 ---
 
-## 5. Quick Demo Commands (Copy-Paste Ready)
+## 5. QoS Traffic Prioritization Test
+
+Tests VoIP, video, and bulk data handling under congestion.
+
+```bash
+# Traditional (best-effort, no QoS)
+docker exec amira-sdn-network python3 /tmp/qos_traffic_test.py --mode traditional
+
+# SDN (DSCP-based queuing, VoIP priority)
+docker exec amira-sdn-network python3 /tmp/qos_traffic_test.py --mode sdn
+
+# Both with comparison
+docker exec amira-sdn-network python3 /tmp/qos_traffic_test.py --mode both
+```
+
+**What it tests:**
+- VoIP latency at baseline (no congestion)
+- VoIP latency during TCP flood (congestion)
+- Video streaming quality during congestion
+- Post-congestion recovery
+
+---
+
+## 6. VLAN Segmentation & ACL Isolation Test
+
+Verifies network segmentation and access control enforcement.
+
+```bash
+# Traditional (flat L2, no isolation)
+docker exec amira-sdn-network python3 /tmp/vlan_isolation_test.py --mode traditional
+
+# SDN (flow-based segmentation)
+docker exec amira-sdn-network python3 /tmp/vlan_isolation_test.py --mode sdn
+
+# Both with comparison
+docker exec amira-sdn-network python3 /tmp/vlan_isolation_test.py --mode both
+```
+
+**What it tests:**
+- Same-VLAN communication (should work)
+- Cross-VLAN isolation (guests can't reach internal)
+- Service ACL enforcement (only authorized VLANs reach servers)
+- Guest VLAN isolation from corporate resources
+
+---
+
+## 7. Controller Resilience Test
+
+Tests SDN single-point-of-failure behavior and graceful degradation.
+
+```bash
+docker exec amira-sdn-network python3 /tmp/controller_resilience_test.py
+```
+
+**Scenarios tested:**
+1. Baseline (controller + standalone) → Normal operation
+2. Secure mode (controller online) → Normal operation
+3. Controller DOWN (secure mode) → Cached flows or network down
+4. Standalone fallback (degraded) → L2 learning, no SDN features
+5. Controller recovery → Full SDN restored
+
+---
+
+## 8. Network Scalability Test
+
+Progressively adds hosts (10, 20, 30, 50) and measures degradation.
+
+```bash
+# Traditional (STP-based)
+docker exec amira-sdn-network python3 /tmp/scalability_test.py --mode traditional
+
+# SDN (controller-computed paths)
+docker exec amira-sdn-network python3 /tmp/scalability_test.py --mode sdn
+
+# Both
+docker exec amira-sdn-network python3 /tmp/scalability_test.py --mode both
+```
+
+**Metrics per scale:**
+- Average latency
+- Connectivity rate
+- Convergence time
+- Latency degradation curve
+
+---
+
+## 9. Quick Demo Commands (Copy-Paste Ready)
 
 ### From Host Machine (macOS)
 
@@ -169,12 +255,28 @@ docker cp scripts/mininet/migration_phases.py amira-sdn-network:/tmp/
 docker cp scripts/mininet/failover_testing.py amira-sdn-network:/tmp/
 docker cp scripts/mininet/traditional_topology.py amira-sdn-network:/tmp/
 docker cp scripts/mininet/sdn_topology.py amira-sdn-network:/tmp/
+docker cp scripts/mininet/qos_traffic_test.py amira-sdn-network:/tmp/
+docker cp scripts/mininet/vlan_isolation_test.py amira-sdn-network:/tmp/
+docker cp scripts/mininet/controller_resilience_test.py amira-sdn-network:/tmp/
+docker cp scripts/mininet/scalability_test.py amira-sdn-network:/tmp/
 
 # Run migration simulation (all phases, no CLI)
 docker exec amira-sdn-network python3 /tmp/migration_phases.py --all --no-cli
 
 # Run failover testing (both modes)
 docker exec amira-sdn-network python3 /tmp/failover_testing.py --mode both
+
+# Run QoS test
+docker exec amira-sdn-network python3 /tmp/qos_traffic_test.py --mode both
+
+# Run VLAN isolation test
+docker exec amira-sdn-network python3 /tmp/vlan_isolation_test.py --mode both
+
+# Run controller resilience
+docker exec amira-sdn-network python3 /tmp/controller_resilience_test.py
+
+# Run scalability test
+docker exec amira-sdn-network python3 /tmp/scalability_test.py --mode both
 
 # Run single phase with CLI access
 docker exec -it amira-sdn-network python3 /tmp/migration_phases.py --phase 0
@@ -268,7 +370,7 @@ python3 /tmp/sdn_topology.py
 
 ---
 
-## 8. Expected Results Summary
+## 12. Expected Results Summary
 
 | Simulation | Expected Outcome |
 |-----------|-----------------|
@@ -277,3 +379,9 @@ python3 /tmp/sdn_topology.py
 | Failover — Core (SDN) | ✓ 5/5 paths survive CS1 failure |
 | Failover — Access (HND) | ✓ 5/5 paths survive DS_A1 link failure |
 | Failover — Access (SDN) | ✓ 5/5 paths survive DS_A1 link failure |
+| QoS — Traditional | ⚠ VoIP degrades significantly under congestion |
+| QoS — SDN | ✓ VoIP prioritized, minimal degradation |
+| VLAN — Traditional | ⚠ No isolation (flat L2, guests reach everything) |
+| VLAN — SDN | ✓ Flow-based segmentation enforced |
+| Controller Resilience | ✓ Standalone fallback keeps network alive |
+| Scalability | ✓ SDN maintains lower latency at scale |
