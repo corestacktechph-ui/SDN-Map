@@ -4,11 +4,6 @@ import { PrismaAdapter } from '@next-auth/prisma-adapter'
 import { compare } from 'bcryptjs'
 import { prisma } from './prisma'
 
-// Validate required environment variables
-if (!process.env.NEXTAUTH_SECRET) {
-  throw new Error('NEXTAUTH_SECRET environment variable is required')
-}
-
 declare module 'next-auth' {
   interface User {
     role?: string
