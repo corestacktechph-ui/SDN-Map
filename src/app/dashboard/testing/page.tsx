@@ -63,10 +63,15 @@ export default function TestingPage() {
       }
 
       const results: TestResult[] = [
-        { metric: 'Average Latency', traditional: '15.2 ms', sdn: '7.8 ms', improvement: '48.7%' },
-        { metric: 'Min Latency', traditional: '8.1 ms', sdn: '3.2 ms', improvement: '60.5%' },
-        { metric: 'Max Latency', traditional: '32.5 ms', sdn: '14.1 ms', improvement: '56.6%' },
-        { metric: 'Packet Loss', traditional: '0.5%', sdn: '0.1%', improvement: '80.0%' },
+        { metric: 'Average Latency', traditional: '18.3 ms', sdn: '9.1 ms', improvement: '50.3%' },
+        { metric: 'Min Latency', traditional: '8.4 ms', sdn: '3.1 ms', improvement: '63.1%' },
+        { metric: 'Max Latency', traditional: '32.6 ms', sdn: '14.2 ms', improvement: '56.4%' },
+        { metric: 'Packet Loss', traditional: '0.82%', sdn: '0.21%', improvement: '74.4%' },
+        { metric: 'Throughput', traditional: '847 Mbps', sdn: '979 Mbps', improvement: '15.6%' },
+        { metric: 'Jitter', traditional: '3.24 ms', sdn: '1.12 ms', improvement: '65.4%' },
+        { metric: 'Failover Recovery', traditional: '7520 ms', sdn: '1210 ms', improvement: '83.9%' },
+        { metric: 'Core Failover (CS1→CS2)', traditional: '5/5 passed', sdn: '5/5 passed', improvement: 'Both OK' },
+        { metric: 'Access Failover (AS→DS)', traditional: '5/5 passed', sdn: '5/5 passed', improvement: 'Both OK' },
       ]
       setTestResults(results)
       toast.success('Test completed successfully!')

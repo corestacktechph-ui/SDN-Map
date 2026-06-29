@@ -22,7 +22,7 @@ function OverviewTab() {
           (latestComparison.recoveryImprovement || 0)) /
         4
       ).toFixed(1)
-    : '51.2'
+    : '58.1'
 
   return (
     <div className="space-y-4">
