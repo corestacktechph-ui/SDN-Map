@@ -46,3 +46,4 @@ docker-data/
 .idea/
 *.swp
 *.swo
+.env.local
