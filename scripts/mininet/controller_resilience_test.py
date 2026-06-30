@@ -24,7 +24,7 @@ def dpid(n):
 
 
 class ResilienceTopo(Topo):
-    """Topology for controller resilience testing."""
+    """Topology for controller resilience testing — full network."""
 
     def build(self):
         info('*** Building Controller Resilience Test Topology ***\n')
@@ -35,28 +35,61 @@ class ResilienceTopo(Topo):
 
         ds1 = self.addSwitch('DS1', cls=OVSKernelSwitch, protocols='OpenFlow13', dpid=dpid(11))
         ds2 = self.addSwitch('DS2', cls=OVSKernelSwitch, protocols='OpenFlow13', dpid=dpid(12))
-        self.addLink(cs1, ds1)
-        self.addLink(cs2, ds1)
-        self.addLink(cs1, ds2)
-        self.addLink(cs2, ds2)
+        ds3 = self.addSwitch('DS3', cls=OVSKernelSwitch, protocols='OpenFlow13', dpid=dpid(13))
+        ds4 = self.addSwitch('DS4', cls=OVSKernelSwitch, protocols='OpenFlow13', dpid=dpid(14))
+        for ds in [ds1, ds2, ds3, ds4]:
+            self.addLink(cs1, ds)
+            self.addLink(cs2, ds)
         self.addLink(ds1, ds2)
+        self.addLink(ds3, ds4)
 
         as1 = self.addSwitch('AS1', cls=OVSKernelSwitch, protocols='OpenFlow13', dpid=dpid(21))
         as2 = self.addSwitch('AS2', cls=OVSKernelSwitch, protocols='OpenFlow13', dpid=dpid(22))
+        as3 = self.addSwitch('AS3', cls=OVSKernelSwitch, protocols='OpenFlow13', dpid=dpid(23))
+        as4 = self.addSwitch('AS4', cls=OVSKernelSwitch, protocols='OpenFlow13', dpid=dpid(24))
         self.addLink(ds1, as1)
         self.addLink(ds2, as1)
         self.addLink(ds1, as2)
         self.addLink(ds2, as2)
+        self.addLink(ds3, as3)
+        self.addLink(ds4, as3)
+        self.addLink(ds3, as4)
+        self.addLink(ds4, as4)
 
-        # Hosts
-        for i in range(1, 7):
-            h = self.addHost(f'h{i}', ip=f'10.0.0.{i}/24', defaultRoute='via 10.0.0.254')
-            if i <= 3:
+        # Edge + Internet
+        edge = self.addSwitch('EdgeRtr', cls=OVSKernelSwitch, protocols='OpenFlow13', dpid=dpid(31))
+        self.addLink(cs1, edge)
+        self.addLink(cs2, edge)
+        inet = self.addHost('INET', ip='198.51.100.100/24', defaultRoute='via 198.51.100.1')
+        self.addLink(inet, edge)
+
+        # Hosts representing each VLAN
+        hosts_cfg = {
+            'h1':  {'ip': '10.1.0.51/22',  'gw': '10.1.3.254'},    # VLAN 10
+            'h4':  {'ip': '10.1.12.51/22', 'gw': '10.1.15.254'},   # VLAN 40
+            'h7':  {'ip': '10.2.0.51/24',  'gw': '10.2.0.254'},    # VLAN 110
+            'h10': {'ip': '10.1.4.51/22',  'gw': '10.1.7.254'},    # VLAN 20
+            'h13': {'ip': '10.1.8.51/22',  'gw': '10.1.11.254'},   # VLAN 30
+            'h16': {'ip': '10.2.1.51/24',  'gw': '10.2.1.254'},    # VLAN 120
+            'h19': {'ip': '10.1.16.51/22', 'gw': '10.1.19.254'},   # VLAN 50
+            'h22': {'ip': '10.1.20.51/22', 'gw': '10.1.23.254'},   # VLAN 60
+            'h25': {'ip': '10.2.2.51/24',  'gw': '10.2.2.254'},    # VLAN 130
+        }
+        for name, cfg in hosts_cfg.items():
+            h = self.addHost(name, ip=cfg['ip'], defaultRoute=f'via {cfg["gw"]}')
+            # Block A hosts → AS1, Block B → AS2, Block C → AS3
+            if name in ('h1', 'h4', 'h7'):
                 self.addLink(as1, h)
-            else:
+            elif name in ('h10', 'h13', 'h16'):
                 self.addLink(as2, h)
+            else:
+                self.addLink(as3, h)
 
-        info('*** Resilience Topology: 6 hosts, 6 switches\n')
+        # Service servers
+        monitor1 = self.addHost('monitor1', ip='10.3.0.18/28', defaultRoute='via 10.3.0.30')
+        self.addLink(as4, monitor1)
+
+        info('*** Resilience Topology: 9 hosts, 1 service, 12 switches, internet\n')
 
 
 def ping_test(net, src_name, dst_name):
@@ -67,7 +100,7 @@ def ping_test(net, src_name, dst_name):
     return '0% packet loss' in result or 'bytes from' in result
 
 
-def ping_latency(net, src_name, dst_name, count=5):
+def ping_latency(net, src_name, dst_name, count=10):
     """Get average latency."""
     src = net.get(src_name)
     dst = net.get(dst_name)
@@ -116,6 +149,16 @@ def run_resilience_test():
         ('h1', 'h4', 'Cross access switch'),
         ('h1', 'h6', 'Furthest pair'),
         ('h3', 'h5', 'Mid-network pair'),
+        ('h1', 'INET', 'Internal host to Internet'),
+        ('h1', 'monitor1', 'VLAN 10 host to enterprise services'),
+        ('h4', 'monitor1', 'VLAN 40 host to enterprise services'),
+        ('h10', 'monitor1', 'VLAN 20 host to enterprise services'),
+        ('h13', 'monitor1', 'VLAN 30 host to enterprise services'),
+        ('h19', 'monitor1', 'VLAN 50 host to enterprise services'),
+        ('h22', 'monitor1', 'VLAN 60 host to enterprise services'),
+        ('h7', 'INET', 'VLAN 110 (Guest A) to Internet'),
+        ('h16', 'INET', 'VLAN 120 (Guest B) to Internet'),
+        ('h25', 'INET', 'VLAN 130 (Guest C) to Internet'),
     ]
 
     baseline_results = []

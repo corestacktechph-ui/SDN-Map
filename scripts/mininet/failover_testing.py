@@ -255,6 +255,12 @@ def test_core_failover(net, mode_name):
         ('h1', 'h19', 'Block A → Block C (cross-block via core)'),
         ('h10', 'h19', 'Block B → Block C'),
         ('h19', 'h25', 'Block C intra-block (different VLAN)'),
+        ('h1', 'erp1', 'VLAN 10 → ERP service'),
+        ('h4', 'erp1', 'VLAN 40 → ERP service'),
+        ('h10', 'hr1', 'VLAN 20 → HR service'),
+        ('h13', 'it1', 'VLAN 30 → IT service'),
+        ('h19', 'voip1', 'VLAN 50 → VoIP service'),
+        ('h22', 'voip1', 'VLAN 60 → VoIP service'),
     ]
 
     for src, dst, desc in test_pairs:
@@ -338,6 +344,11 @@ def test_access_distribution_failover(net, mode_name):
         ('h1', 'h10', 'Block A → Block B'),
         ('h4', 'h19', 'Block A → Block C'),
         ('h7', 'h13', 'Block A (VLAN 110) → Block B (VLAN 30)'),
+        ('h1', 'erp1', 'VLAN 10 → ERP service'),
+        ('h10', 'hr1', 'VLAN 20 → HR service'),
+        ('h13', 'it1', 'VLAN 30 → IT service'),
+        ('h19', 'voip1', 'VLAN 50 → VoIP service'),
+        ('h22', 'voip1', 'VLAN 60 → VoIP service'),
     ]
 
     for src, dst, desc in test_pairs:

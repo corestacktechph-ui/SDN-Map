@@ -45,9 +45,12 @@ class ScalableTopo(Topo):
             self.addLink(cs2, ds)
             dist_switches.append(ds)
 
-        # Cross-links between distribution
-        for i in range(len(dist_switches) - 1):
-            self.addLink(dist_switches[i], dist_switches[i + 1])
+        # Distribution pairs (intra-block peer links only, NO cross-block)
+        # DS1↔DS2 (pair), DS3↔DS4 (pair) — inter-block goes through core
+        if len(dist_switches) >= 2:
+            self.addLink(dist_switches[0], dist_switches[1])
+        if len(dist_switches) >= 4:
+            self.addLink(dist_switches[2], dist_switches[3])
 
         # Access switches (scale with hosts)
         num_access = max(2, num_hosts // 5)
