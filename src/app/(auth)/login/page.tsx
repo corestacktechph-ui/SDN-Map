@@ -30,6 +30,7 @@ export default function LoginPage() {
         email,
         password,
         redirect: false,
+        callbackUrl: '/dashboard',
       })
 
       if (result?.error) {
@@ -38,8 +39,13 @@ export default function LoginPage() {
         return
       }
 
-      // Use window.location for full reload (ensures session cookie is read)
-      window.location.href = '/dashboard'
+      if (result?.ok) {
+        window.location.href = result.url || '/dashboard'
+        return
+      }
+
+      setError('Login failed. Please try again.')
+      setLoading(false)
     } catch {
       setError('An error occurred. Please try again.')
       setLoading(false)
