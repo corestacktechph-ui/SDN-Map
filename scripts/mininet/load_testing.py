@@ -29,6 +29,18 @@ from mininet.node import OVSKernelSwitch, RemoteController
 from mininet.log import setLogLevel, info, error
 
 
+def ping_success(output):
+    """Reliable ping success check."""
+    return (
+        "1 received" in output or
+        "2 received" in output or
+        "3 received" in output or
+        "1 packets transmitted, 1 received" in output or
+        "2 packets transmitted, 2 received" in output or
+        "3 packets transmitted, 3 received" in output
+    )
+
+
 def dpid(n):
     return f'{n:016x}'
 
@@ -224,7 +236,7 @@ def run_iperf3(net, src_name, dst_name, streams=1, bandwidth='100M',
     else:
         # Basic connectivity check
         ping_check = client.cmd(f'ping -c 2 -W 2 {dst_ip} 2>&1')
-        if '0% packet loss' in ping_check or 'bytes from' in ping_check:
+        if ping_success(ping_check):
             return {'throughput_mbps': 0, 'note': 'reachable but flood test failed'}
         return None
 

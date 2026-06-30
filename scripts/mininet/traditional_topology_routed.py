@@ -29,6 +29,18 @@ from mininet.log import setLogLevel, info, error
 from mininet.link import TCLink
 
 
+def ping_success(output):
+    """Reliable ping success check."""
+    return (
+        "1 received" in output or
+        "2 received" in output or
+        "3 received" in output or
+        "1 packets transmitted, 1 received" in output or
+        "2 packets transmitted, 2 received" in output or
+        "3 packets transmitted, 3 received" in output
+    )
+
+
 # ═══════════════════════════════════════════════════════════════
 # LINUX ROUTER NODE (runs FRR for OSPF)
 # ═══════════════════════════════════════════════════════════════
@@ -504,7 +516,7 @@ def run_diagnostics(net):
         h_dst = net.get(dst)
         if h_src and h_dst:
             result = h_src.cmd(f'ping -c 2 -W 3 {h_dst.IP()} 2>&1')
-            ok = '0% packet loss' in result or 'bytes from' in result
+            ok = ping_success(result)
             status = '✓' if ok else '✗'
             if ok:
                 passed += 1

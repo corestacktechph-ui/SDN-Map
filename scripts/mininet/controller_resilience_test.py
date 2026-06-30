@@ -19,6 +19,18 @@ from mininet.node import OVSKernelSwitch, RemoteController
 from mininet.log import setLogLevel, info, error
 
 
+def ping_success(output):
+    """Reliable ping success check."""
+    return (
+        "1 received" in output or
+        "2 received" in output or
+        "3 received" in output or
+        "1 packets transmitted, 1 received" in output or
+        "2 packets transmitted, 2 received" in output or
+        "3 packets transmitted, 3 received" in output
+    )
+
+
 def dpid(n):
     return f'{n:016x}'
 
@@ -97,7 +109,7 @@ def ping_test(net, src_name, dst_name):
     src = net.get(src_name)
     dst = net.get(dst_name)
     result = src.cmd(f'ping -c 3 -W 2 {dst.IP()} 2>&1')
-    return '0% packet loss' in result or 'bytes from' in result
+    return ping_success(result)
 
 
 def ping_latency(net, src_name, dst_name, count=10):

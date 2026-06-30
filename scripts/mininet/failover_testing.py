@@ -27,6 +27,18 @@ from mininet.log import setLogLevel, info, error
 from mininet.link import TCLink
 
 
+def ping_success(output):
+    """Reliable ping success check — avoids false positives from '0% packet loss' substring."""
+    return (
+        "1 received" in output or
+        "2 received" in output or
+        "3 received" in output or
+        "1 packets transmitted, 1 received" in output or
+        "2 packets transmitted, 2 received" in output or
+        "3 packets transmitted, 3 received" in output
+    )
+
+
 # ═══════════════════════════════════════════════════════════════
 # CONFIGURATION
 # ═══════════════════════════════════════════════════════════════
@@ -162,7 +174,7 @@ def ping_test(net, src_name, dst_name, description=''):
     dst_ip = h_dst.IP()
     result = h_src.cmd(f'ping -c 3 -W 2 {dst_ip} 2>&1')
     
-    success = '0% packet loss' in result or (' 0% packet loss' in result)
+    success = ping_success(result)
     # Also check if at least 1 packet received
     if not success:
         for line in result.split('\n'):

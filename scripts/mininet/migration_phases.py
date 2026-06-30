@@ -25,6 +25,18 @@ from mininet.log import setLogLevel, info, error
 import subprocess
 
 
+def ping_success(output):
+    """Reliable ping success check."""
+    return (
+        "1 received" in output or
+        "2 received" in output or
+        "3 received" in output or
+        "1 packets transmitted, 1 received" in output or
+        "2 packets transmitted, 2 received" in output or
+        "3 packets transmitted, 3 received" in output
+    )
+
+
 # ═══════════════════════════════════════════════════════════════
 # CONFIGURATION
 # ═══════════════════════════════════════════════════════════════
@@ -260,8 +272,8 @@ def run_phase(phase_num, start_cli=True):
         h_src = net.get(src)
         h_dst = net.get(dst)
         if h_src and h_dst:
-            result = h_src.cmd(f'ping -c 2 -W 2 {h_dst.IP()} 2>&1 | grep -E "received|loss"')
-            status = '✓ OK' if '0% packet loss' in result or '0 received' not in result else '✗ FAIL'
+            result = h_src.cmd(f'ping -c 2 -W 2 {h_dst.IP()} 2>&1')
+            status = '✓ OK' if ping_success(result) else '✗ FAIL'
             info(f'  {src} -> {dst} ({desc}): {status}\n')
 
     info(f'\n*** Phase {phase_num} ready. Type "pingall" to verify full connectivity.\n')
