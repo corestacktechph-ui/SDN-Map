@@ -38,7 +38,8 @@ export default function LoginPage() {
         return
       }
 
-      router.push('/dashboard')
+      // Use window.location for full reload (ensures session cookie is read)
+      window.location.href = '/dashboard'
     } catch {
       setError('An error occurred. Please try again.')
       setLoading(false)
