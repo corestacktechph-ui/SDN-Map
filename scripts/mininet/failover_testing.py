@@ -405,8 +405,139 @@ def test_access_distribution_failover(net, mode_name):
 
 
 # ═══════════════════════════════════════════════════════════════
-# MAIN TEST RUNNERS
+# TEST 3: DISTRIBUTION SWITCH FAILOVER (DS_X1 → DS_X2)
 # ═══════════════════════════════════════════════════════════════
+def test_distribution_failover(net, mode_name):
+    """
+    Scenario: All links on DS_A1 go down. Traffic must reroute to DS_A2.
+    Replicated for all DS pairs (A, B, C, S).
+    """
+    print_separator(f'TEST 3: DISTRIBUTION SWITCH FAILOVER — {mode_name}')
+    info('  Scenario: All links on DS_X1 down → traffic reroutes to DS_X2\n')
+    info('  Tested for: Block A, Block B, Block C, Services\n')
+
+    all_results = {}
+
+    ds_pairs = [
+        ('DS_A1', 'DS_A2', ['CS1', 'CS2', 'DS_A2', 'AS_A1'],
+         [('h1', 'h10', 'Block A → Block B'), ('h4', 'erp1', 'VLAN 40 → Services')]),
+        ('DS_B1', 'DS_B2', ['CS1', 'CS2', 'DS_B2', 'AS_B1'],
+         [('h10', 'h1', 'Block B → Block A'), ('h13', 'it1', 'VLAN 30 → IT service')]),
+        ('DS_C1', 'DS_C2', ['CS1', 'CS2', 'DS_C2', 'AS_C1'],
+         [('h19', 'h1', 'Block C → Block A'), ('h22', 'voip1', 'VLAN 60 → VoIP')]),
+        ('DS_S1', 'DS_S2', ['CS1', 'CS2', 'DS_S2', 'AS_S1'],
+         [('h1', 'erp1', 'VLAN 10 → ERP'), ('h13', 'monitor1', 'VLAN 30 → Monitor')]),
+    ]
+
+    for ds_primary, ds_backup, neighbors, test_pairs_ds in ds_pairs:
+        info(f'\n  ── {ds_primary} Failover (→ {ds_backup}) ──\n')
+
+        # Baseline
+        baseline_ok = 0
+        for src, dst, desc in test_pairs_ds:
+            success, _ = ping_test(net, src, dst, f'{desc} [baseline]')
+            if success:
+                baseline_ok += 1
+
+        # Bring down all DS_X1 links
+        info(f'    ⬇ Bringing DOWN all {ds_primary} links...\n')
+        for neighbor in neighbors:
+            bring_link_down(net, ds_primary, neighbor)
+
+        time.sleep(5)
+
+        # Test during failover
+        failover_ok = 0
+        for src, dst, desc in test_pairs_ds:
+            success, _ = ping_test(net, src, dst, f'{desc} [{ds_primary} DOWN]')
+            if success:
+                failover_ok += 1
+
+        # Restore
+        info(f'    ⬆ Restoring all {ds_primary} links...\n')
+        for neighbor in neighbors:
+            bring_link_up(net, ds_primary, neighbor)
+        time.sleep(5)
+
+        total = len(test_pairs_ds)
+        status = '✓ PASS' if failover_ok == total else f'✗ {failover_ok}/{total}'
+        info(f'    {ds_primary} failover: {status}\n')
+        all_results[ds_primary] = {'baseline': baseline_ok, 'failover': failover_ok, 'total': total}
+
+    # Summary
+    print_subsection('TEST 3 SUMMARY — Distribution Failover (All Blocks)')
+    for ds, r in all_results.items():
+        status = '✓' if r['failover'] == r['total'] else '✗'
+        info(f'    {status} {ds}: {r["failover"]}/{r["total"]} paths survived\n')
+
+    return all_results
+
+
+# ═══════════════════════════════════════════════════════════════
+# TEST 4: ACCESS SWITCH FAILOVER (AS_X1 link redundancy)
+# ═══════════════════════════════════════════════════════════════
+def test_all_access_failover(net, mode_name):
+    """
+    Scenario: Primary uplink of each access switch goes down.
+    Tests AS_A1, AS_B1, AS_C1 redundant uplinks.
+    """
+    print_separator(f'TEST 4: ACCESS SWITCH FAILOVER (ALL BLOCKS) — {mode_name}')
+    info('  Scenario: Primary uplink (AS→DS1) down, traffic via backup (AS→DS2)\n')
+
+    all_results = {}
+
+    as_tests = [
+        ('AS_A1', 'DS_A1', 'DS_A2',
+         [('h1', 'h10', 'Block A host → Block B'),
+          ('h4', 'h19', 'Block A → Block C'),
+          ('h1', 'erp1', 'VLAN 10 → ERP')]),
+        ('AS_B1', 'DS_B1', 'DS_B2',
+         [('h10', 'h1', 'Block B host → Block A'),
+          ('h13', 'h19', 'Block B → Block C'),
+          ('h10', 'hr1', 'VLAN 20 → HR')]),
+        ('AS_C1', 'DS_C1', 'DS_C2',
+         [('h19', 'h1', 'Block C host → Block A'),
+          ('h22', 'h10', 'Block C → Block B'),
+          ('h19', 'voip1', 'VLAN 50 → VoIP')]),
+    ]
+
+    for as_sw, ds_primary, ds_backup, test_pairs_as in as_tests:
+        info(f'\n  ── {as_sw} Primary Uplink Failover ({as_sw}↔{ds_primary} DOWN) ──\n')
+
+        # Baseline
+        baseline_ok = 0
+        for src, dst, desc in test_pairs_as:
+            success, _ = ping_test(net, src, dst, f'{desc} [baseline]')
+            if success:
+                baseline_ok += 1
+
+        # Bring down primary link
+        bring_link_down(net, as_sw, ds_primary)
+        time.sleep(5)
+
+        # Test during failover
+        failover_ok = 0
+        for src, dst, desc in test_pairs_as:
+            success, _ = ping_test(net, src, dst, f'{desc} [{ds_primary} link DOWN]')
+            if success:
+                failover_ok += 1
+
+        # Restore
+        bring_link_up(net, as_sw, ds_primary)
+        time.sleep(5)
+
+        total = len(test_pairs_as)
+        status = '✓ PASS' if failover_ok == total else f'✗ {failover_ok}/{total}'
+        info(f'    {as_sw} failover: {status}\n')
+        all_results[as_sw] = {'baseline': baseline_ok, 'failover': failover_ok, 'total': total}
+
+    # Summary
+    print_subsection('TEST 4 SUMMARY — Access Switch Failover (All Blocks)')
+    for as_sw, r in all_results.items():
+        status = '✓' if r['failover'] == r['total'] else '✗'
+        info(f'    {status} {as_sw}: {r["failover"]}/{r["total"]} paths survived\n')
+
+    return all_results
 def run_traditional_failover():
     """Run failover tests in Traditional (HND) mode — all switches standalone."""
     print_separator('TRADITIONAL NETWORK (HND) — FAILOVER TESTING')
@@ -433,12 +564,14 @@ def run_traditional_failover():
     info('  ⏳ Waiting for STP convergence (15 seconds)...\n')
     time.sleep(15)
 
-    # Run both tests
+    # Run all tests
     results_core = test_core_failover(net, 'TRADITIONAL (HND)')
     results_access = test_access_distribution_failover(net, 'TRADITIONAL (HND)')
+    results_ds = test_distribution_failover(net, 'TRADITIONAL (HND)')
+    results_as = test_all_access_failover(net, 'TRADITIONAL (HND)')
 
     net.stop()
-    return results_core, results_access
+    return results_core, results_access, results_ds, results_as
 
 
 def run_sdn_failover():
@@ -470,12 +603,14 @@ def run_sdn_failover():
     info('  ⏳ Waiting for controller flow installation (5 seconds)...\n')
     time.sleep(5)
 
-    # Run both tests
+    # Run all tests
     results_core = test_core_failover(net, 'SDN')
     results_access = test_access_distribution_failover(net, 'SDN')
+    results_ds = test_distribution_failover(net, 'SDN')
+    results_as = test_all_access_failover(net, 'SDN')
 
     net.stop()
-    return results_core, results_access
+    return results_core, results_access, results_ds, results_as
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -496,7 +631,7 @@ def print_comparison_report(trad_results, sdn_results):
         # Core failover
         tc_during = sum(trad_core['during']) if trad_core else 0
         sc_during = sum(sdn_core['during']) if sdn_core else 0
-        total_core = 5
+        total_core = len(trad_core['during']) if trad_core else 0
 
         tc_status = f'{tc_during}/{total_core} passed'
         sc_status = f'{sc_during}/{total_core} passed'
@@ -505,7 +640,7 @@ def print_comparison_report(trad_results, sdn_results):
         # Access-Distribution failover
         ta_during = sum(trad_access['during']) if trad_access else 0
         sa_during = sum(sdn_access['during']) if sdn_access else 0
-        total_access = 5
+        total_access = len(trad_access['during']) if trad_access else 0
 
         ta_status = f'{ta_during}/{total_access} passed'
         sa_status = f'{sa_during}/{total_access} passed'
@@ -540,14 +675,15 @@ if __name__ == '__main__':
     sdn_results = None
 
     if args.mode in ('traditional', 'both'):
-        trad_core, trad_access = run_traditional_failover()
-        trad_results = (trad_core, trad_access)
+        trad_results = run_traditional_failover()
 
     if args.mode in ('sdn', 'both'):
-        sdn_core, sdn_access = run_sdn_failover()
-        sdn_results = (sdn_core, sdn_access)
+        sdn_results = run_sdn_failover()
 
-    if args.mode == 'both':
-        print_comparison_report(trad_results, sdn_results)
+    if args.mode == 'both' and trad_results and sdn_results:
+        print_comparison_report(
+            (trad_results[0], trad_results[1]),
+            (sdn_results[0], sdn_results[1])
+        )
 
     print_separator('FAILOVER TESTING COMPLETE')

@@ -242,9 +242,18 @@ def run_phase(phase_num, start_cli=True):
     time.sleep(3)  # Wait for flows to settle
 
     test_pairs = [
-        ('h1', 'h2', 'Same VLAN (Block A)'),
-        ('h19', 'h20', 'Same VLAN (Block C)'),
-        ('h10', 'h11', 'Same VLAN (Block B)'),
+        ('h1', 'h2', 'Same VLAN (Block A, VLAN 10)'),
+        ('h19', 'h20', 'Same VLAN (Block C, VLAN 50)'),
+        ('h10', 'h11', 'Same VLAN (Block B, VLAN 20)'),
+        ('h1', 'h10', 'Cross-block A→B (via core)'),
+        ('h1', 'h19', 'Cross-block A→C (via core)'),
+        ('h10', 'h19', 'Cross-block B→C (via core)'),
+        ('h1', 'erp1', 'VLAN 10 → ERP service'),
+        ('h4', 'monitor1', 'VLAN 40 → Monitor service'),
+        ('h10', 'hr1', 'VLAN 20 → HR service'),
+        ('h13', 'it1', 'VLAN 30 → IT service'),
+        ('h19', 'voip1', 'VLAN 50 → VoIP service'),
+        ('h22', 'voip1', 'VLAN 60 → VoIP service'),
     ]
 
     for src, dst, desc in test_pairs:
