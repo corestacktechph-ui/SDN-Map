@@ -106,9 +106,8 @@ class SDNHierarchicalTopo(Topo):
         for pair in [(ds_a1, ds_a2), (ds_b1, ds_b2), (ds_c1, ds_c2), (ds_s1, ds_s2)]:
             self.addLink(*pair)
 
-        self.addLink(ds_a1, ds_b1)
-        self.addLink(ds_b1, ds_c1)
-        self.addLink(ds_c1, ds_s1)
+        # Cross-block links REMOVED — inter-block traffic routes via core
+        # SDN controller handles inter-block routing via flow rules on CS1/CS2
 
         self.addLink(ds_a1, as_a1)
         self.addLink(ds_a2, as_a1)

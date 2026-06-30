@@ -118,10 +118,8 @@ class FailoverTopo(Topo):
         for a, b in [('DS_A1', 'DS_A2'), ('DS_B1', 'DS_B2'), ('DS_C1', 'DS_C2'), ('DS_S1', 'DS_S2')]:
             self.addLink(switches[a], switches[b])
 
-        # Cross-block
-        self.addLink(switches['DS_A1'], switches['DS_B1'])
-        self.addLink(switches['DS_B1'], switches['DS_C1'])
-        self.addLink(switches['DS_C1'], switches['DS_S1'])
+        # Cross-block links REMOVED — inter-block traffic routes via core (L3/OSPF)
+        # In proper hierarchical design, blocks only connect through CS1/CS2
 
         # Distribution to Access (redundant)
         for ds1, ds2, access in [('DS_A1', 'DS_A2', 'AS_A1'), ('DS_B1', 'DS_B2', 'AS_B1'),

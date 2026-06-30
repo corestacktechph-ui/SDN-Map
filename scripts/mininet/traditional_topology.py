@@ -118,9 +118,11 @@ class TraditionalHierarchicalTopo(Topo):
             self.addLink(*pair)
 
         # ===== Cross-Block Distribution Links =====
-        self.addLink(ds_a1, ds_b1)
-        self.addLink(ds_b1, ds_c1)
-        self.addLink(ds_c1, ds_s1)
+        # REMOVED: Cross-block links bypass L3 routing through core
+        # Inter-block traffic must route via CS1/CS2 (OSPF/L3)
+        # self.addLink(ds_a1, ds_b1)  # NOT in proper hierarchical design
+        # self.addLink(ds_b1, ds_c1)  # NOT in proper hierarchical design
+        # self.addLink(ds_c1, ds_s1)  # NOT in proper hierarchical design
 
         # ===== Distribution-Access Links (Redundant) =====
         self.addLink(ds_a1, as_a1)
