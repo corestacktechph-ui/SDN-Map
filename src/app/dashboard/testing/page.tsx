@@ -45,8 +45,11 @@ export default function TestingPage() {
       const tradTopology = await fetch('/api/topology').then(r => r.json()).then(d => d.find((t: { type: string }) => t.type === 'TRADITIONAL'))
       const sdnTopology = await fetch('/api/topology').then(r => r.json()).then(d => d.find((t: { type: string }) => t.type === 'SDN'))
 
+      let tradTest = null
+      let sdnTest = null
+
       if (tradTopology) {
-        await createTest.mutateAsync({
+        tradTest = await createTest.mutateAsync({
           name: `${selectedTest.charAt(0).toUpperCase() + selectedTest.slice(1)} Test (Traditional)`,
           type: selectedTest,
           topologyId: tradTopology.id,
@@ -54,7 +57,7 @@ export default function TestingPage() {
         })
       }
       if (sdnTopology) {
-        await createTest.mutateAsync({
+        sdnTest = await createTest.mutateAsync({
           name: `${selectedTest.charAt(0).toUpperCase() + selectedTest.slice(1)} Test (SDN)`,
           type: selectedTest,
           topologyId: sdnTopology.id,
@@ -62,18 +65,51 @@ export default function TestingPage() {
         })
       }
 
-      const results: TestResult[] = [
-        { metric: 'Average Latency', traditional: '18.3 ms', sdn: '9.1 ms', improvement: '50.3%' },
-        { metric: 'Min Latency', traditional: '8.4 ms', sdn: '3.1 ms', improvement: '63.1%' },
-        { metric: 'Max Latency', traditional: '32.6 ms', sdn: '14.2 ms', improvement: '56.4%' },
-        { metric: 'Packet Loss', traditional: '0.82%', sdn: '0.21%', improvement: '74.4%' },
-        { metric: 'Throughput', traditional: '847 Mbps', sdn: '979 Mbps', improvement: '15.6%' },
-        { metric: 'Jitter', traditional: '3.24 ms', sdn: '1.12 ms', improvement: '65.4%' },
-        { metric: 'Failover Recovery', traditional: '7520 ms', sdn: '1210 ms', improvement: '83.9%' },
-        { metric: 'Core Failover (CS1→CS2)', traditional: '5/5 passed', sdn: '5/5 passed', improvement: 'Both OK' },
-        { metric: 'Access Failover (AS→DS)', traditional: '5/5 passed', sdn: '5/5 passed', improvement: 'Both OK' },
-      ]
+      // Build results from actual DB response
+      const results: TestResult[] = []
+
+      if (tradTest?.results && sdnTest?.results) {
+        // Match metrics between traditional and SDN
+        const tradMetrics = tradTest.results as Array<{ metric: string; value: number; unit: string }>
+        const sdnMetrics = sdnTest.results as Array<{ metric: string; value: number; unit: string }>
+
+        for (const tradResult of tradMetrics) {
+          const sdnResult = sdnMetrics.find(s => s.metric === tradResult.metric)
+          if (sdnResult) {
+            const tradVal = tradResult.value
+            const sdnVal = sdnResult.value
+            const unit = tradResult.unit
+            // For throughput, higher is better
+            const higherIsBetter = unit === 'Mbps' || unit === 'paths passed'
+            const improvement = tradVal !== 0
+              ? higherIsBetter
+                ? `${(((sdnVal - tradVal) / tradVal) * 100).toFixed(1)}%`
+                : `${(((tradVal - sdnVal) / tradVal) * 100).toFixed(1)}%`
+              : 'N/A'
+
+            results.push({
+              metric: tradResult.metric,
+              traditional: `${tradVal} ${unit}`,
+              sdn: `${sdnVal} ${unit}`,
+              improvement,
+            })
+          }
+        }
+      }
+
+      // If no matched results, show a message
+      if (results.length === 0) {
+        results.push({
+          metric: 'Awaiting Mininet Data',
+          traditional: '—',
+          sdn: '—',
+          improvement: 'Run Mininet simulation first',
+        })
+      }
+
       setTestResults(results)
+      queryClient.invalidateQueries({ queryKey: ['tests'] })
+      queryClient.invalidateQueries({ queryKey: ['comparisons'] })
       toast.success('Test completed successfully!')
     } catch {
       toast.error('Test failed. Please try again.')

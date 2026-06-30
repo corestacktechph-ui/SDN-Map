@@ -54,33 +54,53 @@ interface StatisticalResult {
 export default function StatisticalAnalysis() {
   const [results, setResults] = useState<StatisticalResult[]>([])
   const [loading, setLoading] = useState(false)
+  const [dataSource, setDataSource] = useState<'live' | 'none'>('none')
 
-  // Data calibrated from actual Mininet simulation results
-  // Migration: 6 phases completed, all connectivity tests passed
-  // Failover: CS1→CS2 (5/5 passed), AS_A1-DS_A1→DS_A2 (5/5 passed)
-  // Traditional: STP-based failover (~7.5s convergence)
-  // SDN: Controller-managed fast failover (~1.2s)
-  const sampleData = {
-    latency: {
-      traditional: [18.3, 17.8, 19.2, 18.6, 18.9, 17.5, 19.4, 18.1, 18.7, 18.4],
-      sdn: [9.1, 8.7, 9.4, 9.2, 8.9, 9.3, 9.0, 9.5, 8.8, 9.1],
-    },
-    throughput: {
-      traditional: [847, 852, 838, 851, 845, 841, 856, 849, 843, 850],
-      sdn: [979, 983, 975, 981, 977, 984, 978, 982, 976, 980],
-    },
-    packetLoss: {
-      traditional: [0.82, 0.79, 0.85, 0.81, 0.83, 0.78, 0.84, 0.80, 0.77, 0.86],
-      sdn: [0.21, 0.19, 0.24, 0.20, 0.22, 0.23, 0.18, 0.21, 0.25, 0.20],
-    },
-    jitter: {
-      traditional: [3.24, 3.15, 3.38, 3.30, 3.22, 3.05, 3.42, 3.28, 3.10, 3.35],
-      sdn: [1.12, 1.05, 1.18, 1.10, 1.08, 1.22, 1.14, 1.16, 1.06, 1.11],
-    },
-    failoverTime: {
-      traditional: [7520, 7810, 7230, 7650, 7380, 7720, 7340, 7490, 7880, 7420],
-      sdn: [1210, 1250, 1180, 1230, 1190, 1240, 1200, 1220, 1260, 1185],
-    },
+  // Try to fetch live results from the database
+  const fetchLiveData = async () => {
+    try {
+      const response = await fetch('/api/results')
+      if (!response.ok) return null
+      const allResults = await response.json()
+      if (!allResults || allResults.length === 0) return null
+
+      // Group results by metric and topology type
+      const grouped: Record<string, { traditional: number[]; sdn: number[] }> = {}
+
+      for (const result of allResults) {
+        const topologyType = result.test?.topology?.type?.toUpperCase()
+        if (!topologyType) continue
+
+        const metricKey = result.metric.toLowerCase().includes('latency') ? 'latency'
+          : result.metric.toLowerCase().includes('throughput') ? 'throughput'
+          : result.metric.toLowerCase().includes('packet loss') ? 'packetLoss'
+          : result.metric.toLowerCase().includes('jitter') ? 'jitter'
+          : result.metric.toLowerCase().includes('recovery') ? 'failoverTime'
+          : null
+
+        if (!metricKey) continue
+
+        if (!grouped[metricKey]) grouped[metricKey] = { traditional: [], sdn: [] }
+
+        if (topologyType === 'TRADITIONAL') {
+          grouped[metricKey].traditional.push(result.value)
+        } else if (topologyType === 'SDN') {
+          grouped[metricKey].sdn.push(result.value)
+        }
+      }
+
+      // Only use live data if we have enough samples (at least 3 for each side)
+      const validMetrics = Object.entries(grouped).filter(
+        ([, data]) => data.traditional.length >= 3 && data.sdn.length >= 3
+      )
+
+      if (validMetrics.length >= 2) {
+        return Object.fromEntries(validMetrics) as Record<string, { traditional: number[]; sdn: number[] }>
+      }
+      return null
+    } catch {
+      return null
+    }
   }
 
   const calculateStats = (data: number[]) => {
@@ -135,39 +155,49 @@ export default function StatisticalAnalysis() {
     }
   }
 
-  const runAnalysis = () => {
+  const runAnalysis = async () => {
     setLoading(true)
 
-    setTimeout(() => {
-      const analysisResults: StatisticalResult[] = Object.entries(sampleData).map(
-        ([metric, data]) => {
-          const tradStats = calculateStats(data.traditional)
-          const sdnStats = calculateStats(data.sdn)
-          const testResults = calculateTTest(
-            data.traditional,
-            data.sdn,
-            tradStats,
-            sdnStats
-          )
+    // Fetch live data from DB (actual Mininet results)
+    const liveData = await fetchLiveData()
 
-          const improvement =
-            metric === 'throughput'
-              ? ((sdnStats.mean - tradStats.mean) / tradStats.mean) * 100
-              : ((tradStats.mean - sdnStats.mean) / tradStats.mean) * 100
-
-          return {
-            metric: metric.charAt(0).toUpperCase() + metric.slice(1).replace(/([A-Z])/g, ' $1'),
-            traditional: tradStats,
-            sdn: sdnStats,
-            improvement,
-            ...testResults,
-          }
-        }
-      )
-
-      setResults(analysisResults)
+    if (!liveData) {
+      setDataSource('none')
+      setResults([])
       setLoading(false)
-    }, 1000)
+      return
+    }
+
+    setDataSource('live')
+
+    const analysisResults: StatisticalResult[] = Object.entries(liveData).map(
+      ([metric, data]) => {
+        const tradStats = calculateStats(data.traditional)
+        const sdnStats = calculateStats(data.sdn)
+        const testResults = calculateTTest(
+          data.traditional,
+          data.sdn,
+          tradStats,
+          sdnStats
+        )
+
+        const improvement =
+          metric === 'throughput'
+            ? ((sdnStats.mean - tradStats.mean) / tradStats.mean) * 100
+            : ((tradStats.mean - sdnStats.mean) / tradStats.mean) * 100
+
+        return {
+          metric: metric.charAt(0).toUpperCase() + metric.slice(1).replace(/([A-Z])/g, ' $1'),
+          traditional: tradStats,
+          sdn: sdnStats,
+          improvement,
+          ...testResults,
+        }
+      }
+    )
+
+    setResults(analysisResults)
+    setLoading(false)
   }
 
   useEffect(() => {
@@ -196,6 +226,12 @@ export default function StatisticalAnalysis() {
               <CardTitle className="flex items-center gap-2">
                 <Calculator className="h-5 w-5" />
                 Statistical Significance Analysis
+                {dataSource === 'live' && (
+                  <Badge variant="default" className="ml-2 text-[10px]">LIVE MININET DATA</Badge>
+                )}
+                {dataSource === 'none' && (
+                  <Badge variant="secondary" className="ml-2 text-[10px]">NO DATA — RUN MININET FIRST</Badge>
+                )}
               </CardTitle>
               <p className="text-sm text-muted-foreground mt-1">
                 T-test analysis with 95% confidence intervals

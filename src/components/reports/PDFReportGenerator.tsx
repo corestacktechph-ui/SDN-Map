@@ -35,18 +35,18 @@ export default function PDFReportGenerator() {
 
   const sampleData = {
     traditional: {
-      latency: tradLatency?.value ?? 18.5,
-      throughput: tradThroughput?.value ?? 850,
-      packetLoss: tradPacketLoss?.value ?? 0.8,
-      jitter: tradJitter?.value ?? 3.2,
-      failoverTime: tradFailover?.value ?? 7500,
+      latency: tradLatency?.value ?? 0,
+      throughput: tradThroughput?.value ?? 0,
+      packetLoss: tradPacketLoss?.value ?? 0,
+      jitter: tradJitter?.value ?? 0,
+      failoverTime: tradFailover?.value ?? 0,
     },
     sdn: {
-      latency: sdnLatency?.value ?? 9.2,
-      throughput: sdnThroughput?.value ?? 980,
-      packetLoss: sdnPacketLoss?.value ?? 0.2,
-      jitter: sdnJitter?.value ?? 1.1,
-      failoverTime: sdnFailover?.value ?? 1200,
+      latency: sdnLatency?.value ?? 0,
+      throughput: sdnThroughput?.value ?? 0,
+      packetLoss: sdnPacketLoss?.value ?? 0,
+      jitter: sdnJitter?.value ?? 0,
+      failoverTime: sdnFailover?.value ?? 0,
     },
   }
 

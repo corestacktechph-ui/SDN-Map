@@ -92,9 +92,9 @@ export default function DashboardPage() {
           </Card>
         </motion.div>
         {[
-          { title: 'Avg Latency', value: isControllerOnline ? '9.1 ms' : '18.3 ms', icon: <Gauge className="h-4 w-4" /> },
-          { title: 'Throughput', value: isControllerOnline ? '979 Mbps' : '847 Mbps', icon: <Zap className="h-4 w-4" /> },
-          { title: 'Recovery Time', value: isControllerOnline ? '1210 ms' : '7520 ms', icon: <Clock className="h-4 w-4" /> },
+          { title: 'Avg Latency', value: stats?.latency ?? '—', icon: <Gauge className="h-4 w-4" /> },
+          { title: 'Throughput', value: stats?.throughput ?? '—', icon: <Zap className="h-4 w-4" /> },
+          { title: 'Recovery Time', value: stats?.recoveryTime ?? '—', icon: <Clock className="h-4 w-4" /> },
         ].map((card, i) => (
           <motion.div
             key={card.title}

@@ -25,12 +25,33 @@ export async function GET() {
       }),
       activeSessions: 0,
       controllerStatus: 'DISCONNECTED',
+      latency: '—',
+      throughput: '—',
+      recoveryTime: '—',
     }
 
     const controller = await prisma.controller.findFirst()
     if (controller) {
       stats.controllerStatus = controller.status
     }
+
+    // Fetch latest performance metrics from actual Mininet test results
+    const latestLatency = await prisma.performanceResult.findFirst({
+      where: { metric: { contains: 'Latency' }, value: { gt: 0 } },
+      orderBy: { timestamp: 'desc' },
+    })
+    const latestThroughput = await prisma.performanceResult.findFirst({
+      where: { metric: { contains: 'Throughput' }, value: { gt: 0 } },
+      orderBy: { timestamp: 'desc' },
+    })
+    const latestRecovery = await prisma.performanceResult.findFirst({
+      where: { metric: { contains: 'Recovery' }, value: { gt: 0 } },
+      orderBy: { timestamp: 'desc' },
+    })
+
+    if (latestLatency) stats.latency = `${latestLatency.value} ${latestLatency.unit}`
+    if (latestThroughput) stats.throughput = `${latestThroughput.value} ${latestThroughput.unit}`
+    if (latestRecovery) stats.recoveryTime = `${latestRecovery.value} ${latestRecovery.unit}`
 
     return NextResponse.json(stats)
   } catch (error) {

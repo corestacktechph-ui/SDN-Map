@@ -1,61 +1,65 @@
 import { prisma } from '@/lib/prisma'
 
-type TestType = 'ping' | 'throughput' | 'jitter' | 'failover'
+/**
+ * Executes a performance test by triggering actual Mininet simulation
+ * via the Docker container and storing the real results.
+ * 
+ * Flow:
+ * 1. Web UI clicks "Run Test" → creates PerformanceTest record
+ * 2. This function triggers the Mininet script inside Docker
+ * 3. The Mininet script runs the actual test and POSTs results back to /api/simulation-results
+ * 4. If Docker/Mininet is not available, falls back to pulling the latest results from DB
+ */
 
-// Values calibrated from actual Mininet simulation results
-// Migration phases: all 6 phases passed connectivity (0% packet loss)
-// Failover tests: 5/5 paths survived for both HND (STP) and SDN (controller)
-// Traditional uses STP reconvergence (~15s wait), SDN uses controller fast-failover (~50ms)
-const BASE_METRICS: Record<TestType, Record<'TRADITIONAL' | 'SDN', Array<{
-  metric: string; baseValue: number; unit: string; variance: number; sampleSize: number
-}>>> = {
-  ping: {
-    TRADITIONAL: [
-      { metric: 'Average Latency', baseValue: 18.3, unit: 'ms', variance: 5.2, sampleSize: 27 },
-      { metric: 'Packet Loss', baseValue: 0.82, unit: '%', variance: 0.35, sampleSize: 27 },
-      { metric: 'Jitter', baseValue: 3.24, unit: 'ms', variance: 1.2, sampleSize: 27 },
-    ],
-    SDN: [
-      { metric: 'Average Latency', baseValue: 9.1, unit: 'ms', variance: 2.4, sampleSize: 27 },
-      { metric: 'Packet Loss', baseValue: 0.21, unit: '%', variance: 0.08, sampleSize: 27 },
-      { metric: 'Jitter', baseValue: 1.12, unit: 'ms', variance: 0.4, sampleSize: 27 },
-    ],
-  },
-  throughput: {
-    TRADITIONAL: [
-      { metric: 'Throughput', baseValue: 847, unit: 'Mbps', variance: 45, sampleSize: 27 },
-    ],
-    SDN: [
-      { metric: 'Throughput', baseValue: 979, unit: 'Mbps', variance: 28, sampleSize: 27 },
-    ],
-  },
-  jitter: {
-    TRADITIONAL: [
-      { metric: 'Jitter', baseValue: 3.24, unit: 'ms', variance: 1.2, sampleSize: 27 },
-    ],
-    SDN: [
-      { metric: 'Jitter', baseValue: 1.12, unit: 'ms', variance: 0.4, sampleSize: 27 },
-    ],
-  },
-  failover: {
-    TRADITIONAL: [
-      { metric: 'Recovery Time', baseValue: 7520, unit: 'ms', variance: 1800, sampleSize: 10 },
-      { metric: 'Packet Loss During Failover', baseValue: 2.8, unit: '%', variance: 1.2, sampleSize: 10 },
-      { metric: 'Core Failover (CS1→CS2)', baseValue: 5, unit: 'paths passed', variance: 0, sampleSize: 5 },
-      { metric: 'Access Failover (AS_A1→DS_A2)', baseValue: 5, unit: 'paths passed', variance: 0, sampleSize: 5 },
-    ],
-    SDN: [
-      { metric: 'Recovery Time', baseValue: 1210, unit: 'ms', variance: 250, sampleSize: 10 },
-      { metric: 'Packet Loss During Failover', baseValue: 0.18, unit: '%', variance: 0.1, sampleSize: 10 },
-      { metric: 'Core Failover (CS1→CS2)', baseValue: 5, unit: 'paths passed', variance: 0, sampleSize: 5 },
-      { metric: 'Access Failover (AS_A1→DS_A2)', baseValue: 5, unit: 'paths passed', variance: 0, sampleSize: 5 },
-    ],
-  },
+type TestType = 'ping' | 'throughput' | 'throughput-tcp' | 'throughput-udp' | 'jitter' | 'failover'
+
+// Map test types to Mininet script commands
+const MININET_COMMANDS: Record<string, string> = {
+  'ping': 'python3 /app/mininet_scripts/traditional_topology.py --test ping',
+  'throughput': 'python3 /app/mininet_scripts/traditional_topology.py --test throughput',
+  'throughput-tcp': 'python3 /app/mininet_scripts/traditional_topology.py --test throughput',
+  'throughput-udp': 'python3 /app/mininet_scripts/traditional_topology.py --test throughput',
+  'jitter': 'python3 /app/mininet_scripts/qos_traffic_test.py',
+  'failover': 'python3 /app/mininet_scripts/failover_testing.py',
 }
 
-function generateMetricValue(baseValue: number, variance: number): number {
-  const noise = (Math.random() - 0.5) * 2 * variance
-  return Math.max(0, Math.round((baseValue + noise) * 100) / 100)
+async function triggerMininetTest(testType: string, topologyType: string): Promise<boolean> {
+  /**
+   * Try to trigger the Mininet simulation via Docker exec.
+   * Returns true if triggered successfully, false if Docker is not available.
+   */
+  try {
+    const mode = topologyType.toLowerCase() === 'sdn' ? 'sdn' : 'traditional'
+    const apiUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+
+    // Execute the Mininet script via Docker with the API URL for posting results
+    const { exec } = await import('child_process')
+    const { promisify } = await import('util')
+    const execAsync = promisify(exec)
+
+    const containerName = 'amira-mininet'
+    const scriptMap: Record<string, string> = {
+      'ping': `/app/mininet_scripts/traditional_topology.py --test ping --mode ${mode} --api-url ${apiUrl}`,
+      'throughput': `/app/mininet_scripts/traditional_topology.py --test throughput --mode ${mode} --api-url ${apiUrl}`,
+      'throughput-tcp': `/app/mininet_scripts/traditional_topology.py --test throughput --mode ${mode} --api-url ${apiUrl}`,
+      'throughput-udp': `/app/mininet_scripts/traditional_topology.py --test throughput --mode ${mode} --api-url ${apiUrl}`,
+      'jitter': `/app/mininet_scripts/qos_traffic_test.py --mode ${mode}`,
+      'failover': `/app/mininet_scripts/failover_testing.py --mode ${mode}`,
+    }
+
+    const script = scriptMap[testType] || scriptMap['ping']
+    const cmd = `docker exec ${containerName} python3 ${script}`
+
+    // Run in background — don't wait for completion (simulations take time)
+    // The Mininet script will POST results to /api/simulation-results when done
+    execAsync(cmd, { timeout: 120000 }).catch(() => {
+      // Silently ignore — Mininet will post results via API when done
+    })
+
+    return true
+  } catch {
+    return false
+  }
 }
 
 export async function executePerformanceTest(testId: string) {
@@ -73,32 +77,64 @@ export async function executePerformanceTest(testId: string) {
   }
 
   const topologyType = test.topology.type as 'TRADITIONAL' | 'SDN'
-  const testType = (test.type as TestType) in BASE_METRICS ? (test.type as TestType) : 'ping'
-  const metricDefs = BASE_METRICS[testType][topologyType]
+  const testType = test.type
 
   await prisma.performanceTest.update({
     where: { id: testId },
     data: { status: 'RUNNING', startedAt: new Date() },
   })
 
-  const results = metricDefs.map((def) => {
-    const value = generateMetricValue(def.baseValue, def.variance)
-    const minValue = Math.max(0, value - def.variance)
-    const maxValue = value + def.variance
-    return {
-      testId,
-      metric: def.metric,
-      value,
-      unit: def.unit,
-      minValue: Math.round(minValue * 100) / 100,
-      maxValue: Math.round(maxValue * 100) / 100,
-      stdDev: Math.round(def.variance * 0.4 * 100) / 100,
-      sampleSize: def.sampleSize,
-      rawData: null,
-    }
+  // Try to trigger actual Mininet simulation
+  const mininetTriggered = await triggerMininetTest(testType, topologyType)
+
+  // Pull the latest results from the DB for this test type and topology
+  // (either from a previous Mininet run or from the just-triggered one)
+  const latestResults = await prisma.performanceResult.findMany({
+    where: {
+      test: {
+        type: testType,
+        status: 'COMPLETED',
+        topology: { type: topologyType },
+        config: { contains: 'mininet' },  // Only use results from actual Mininet runs
+      },
+    },
+    orderBy: { timestamp: 'desc' },
+    take: 10,
   })
 
-  await prisma.performanceResult.createMany({ data: results })
+  if (latestResults.length > 0) {
+    // Use actual Mininet data — copy the latest results to this test
+    const results = latestResults.slice(0, 5).map((r) => ({
+      testId,
+      metric: r.metric,
+      value: r.value,
+      unit: r.unit,
+      minValue: r.minValue,
+      maxValue: r.maxValue,
+      stdDev: r.stdDev,
+      sampleSize: r.sampleSize,
+      rawData: r.rawData,
+    }))
+
+    await prisma.performanceResult.createMany({ data: results })
+  } else {
+    // No Mininet results available yet — mark as pending for Mininet to fill
+    // Create placeholder results indicating Mininet data needed
+    const placeholderMetrics = getPlaceholderMetrics(testType, topologyType)
+    await prisma.performanceResult.createMany({
+      data: placeholderMetrics.map((m) => ({
+        testId,
+        metric: m.metric,
+        value: 0,
+        unit: m.unit,
+        minValue: null,
+        maxValue: null,
+        stdDev: null,
+        sampleSize: 0,
+        rawData: mininetTriggered ? 'PENDING_MININET' : 'NO_MININET_AVAILABLE',
+      })),
+    })
+  }
 
   const completed = await prisma.performanceTest.update({
     where: { id: testId },
@@ -106,10 +142,36 @@ export async function executePerformanceTest(testId: string) {
     include: { results: true, topology: { select: { name: true, type: true } } },
   })
 
-  // Auto-create comparison when both traditional and SDN tests exist for same topology
+  // Auto-create comparison
   await autoCreateComparison(testId)
 
   return completed
+}
+
+function getPlaceholderMetrics(testType: string, _topologyType: string): Array<{ metric: string; unit: string }> {
+  switch (testType) {
+    case 'ping':
+      return [
+        { metric: 'Average Latency', unit: 'ms' },
+        { metric: 'Packet Loss', unit: '%' },
+        { metric: 'Jitter', unit: 'ms' },
+      ]
+    case 'throughput':
+    case 'throughput-tcp':
+    case 'throughput-udp':
+      return [{ metric: 'Throughput', unit: 'Mbps' }]
+    case 'jitter':
+      return [{ metric: 'Jitter', unit: 'ms' }]
+    case 'failover':
+      return [
+        { metric: 'Recovery Time', unit: 'ms' },
+        { metric: 'Packet Loss During Failover', unit: '%' },
+        { metric: 'Core Failover (CS1→CS2)', unit: 'paths passed' },
+        { metric: 'Access Failover (AS_A1→DS_A2)', unit: 'paths passed' },
+      ]
+    default:
+      return [{ metric: 'Average Latency', unit: 'ms' }]
+  }
 }
 
 async function autoCreateComparison(testId: string) {
@@ -138,6 +200,11 @@ async function autoCreateComparison(testId: string) {
   const pairedTest = pairedTests[0]
   const tradTest = test.topology.type === 'TRADITIONAL' ? test : pairedTest
   const sdnTest = test.topology.type === 'SDN' ? test : pairedTest
+
+  // Don't create comparison if either side has placeholder (value=0) results
+  const tradHasReal = tradTest.results.some((r) => r.value > 0)
+  const sdnHasReal = sdnTest.results.some((r) => r.value > 0)
+  if (!tradHasReal || !sdnHasReal) return
 
   // Check if comparison already exists
   const existing = await prisma.comparisonResult.findFirst({
@@ -199,7 +266,8 @@ function generateSummary(
   if (packetLoss) improvements.push(`packet loss reduced by ${Math.abs(packetLoss)}%`)
   if (recovery) improvements.push(`failover recovery ${Math.abs(recovery)}% faster`)
   if (jitter) improvements.push(`jitter reduced by ${Math.abs(jitter)}%`)
-  return `SDN shows significant improvements: ${improvements.join(', ')}. The migration demonstrates clear performance advantages across all measured metrics.`
+  if (improvements.length === 0) return 'Awaiting Mininet simulation results.'
+  return `SDN shows significant improvements: ${improvements.join(', ')}. Results from live Mininet simulation.`
 }
 
 export async function completePendingTests() {

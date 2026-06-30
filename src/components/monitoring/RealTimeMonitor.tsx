@@ -18,10 +18,41 @@ interface MetricData {
 export default function RealTimeMonitor({ type = 'sdn' }: { type?: 'traditional' | 'sdn' }) {
   const [isLive, setIsLive] = useState(true)
   const [data, setData] = useState<MetricData[]>([])
+  const [baseValues, setBaseValues] = useState<{ latency: number; throughput: number; packetLoss: number } | null>(null)
   const [currentMetrics, setCurrentMetrics] = useState({
     latency: 0, throughput: 0, packetLoss: 0, flows: 0, connections: 0,
   })
   const { metrics: wsMetrics } = useSocket()
+
+  // Fetch latest metrics from DB on mount
+  useEffect(() => {
+    async function fetchBaseMetrics() {
+      try {
+        const res = await fetch('/api/results')
+        if (!res.ok) return
+        const allResults = await res.json()
+        if (!allResults || allResults.length === 0) return
+
+        const topologyFilter = type.toUpperCase()
+        const filtered = allResults.filter((r: any) => r.test?.topology?.type === topologyFilter && r.value > 0)
+
+        const latencyResult = filtered.find((r: any) => r.metric.toLowerCase().includes('latency'))
+        const throughputResult = filtered.find((r: any) => r.metric.toLowerCase().includes('throughput'))
+        const packetLossResult = filtered.find((r: any) => r.metric.toLowerCase().includes('packet loss'))
+
+        if (latencyResult || throughputResult || packetLossResult) {
+          setBaseValues({
+            latency: latencyResult?.value ?? 0,
+            throughput: throughputResult?.value ?? 0,
+            packetLoss: packetLossResult?.value ?? 0,
+          })
+        }
+      } catch {
+        // silently ignore
+      }
+    }
+    fetchBaseMetrics()
+  }, [type])
 
   useEffect(() => {
     if (!isLive) return
@@ -29,18 +60,16 @@ export default function RealTimeMonitor({ type = 'sdn' }: { type?: 'traditional'
     const generatePoint = () => {
       const now = new Date()
       const timeStr = now.toLocaleTimeString()
-      // Values calibrated from Mininet simulation results
-      // Traditional: STP-based, higher latency, lower throughput
-      // SDN: Controller-managed, fast path computation
-      const baseLatency = type === 'sdn' ? 9.1 : 18.3
-      const baseThroughput = type === 'sdn' ? 979 : 847
-      const basePacketLoss = type === 'sdn' ? 0.21 : 0.82
+      // Use actual Mininet values from DB, or show 0 if no data
+      const baseLatency = baseValues?.latency ?? 0
+      const baseThroughput = baseValues?.throughput ?? 0
+      const basePacketLoss = baseValues?.packetLoss ?? 0
 
       return {
         time: timeStr,
-        latency: wsMetrics?.latency ?? (baseLatency + (Math.random() - 0.5) * 4),
-        throughput: wsMetrics?.throughput ?? (baseThroughput + (Math.random() - 0.5) * 50),
-        packetLoss: wsMetrics?.packetLoss ?? Math.max(0, basePacketLoss + (Math.random() - 0.5) * 0.3),
+        latency: wsMetrics?.latency ?? (baseLatency > 0 ? baseLatency + (Math.random() - 0.5) * 4 : 0),
+        throughput: wsMetrics?.throughput ?? (baseThroughput > 0 ? baseThroughput + (Math.random() - 0.5) * 50 : 0),
+        packetLoss: wsMetrics?.packetLoss ?? (basePacketLoss > 0 ? Math.max(0, basePacketLoss + (Math.random() - 0.5) * 0.3) : 0),
         flows: wsMetrics?.flows ?? (type === 'sdn' ? Math.floor(Math.random() * 50) + 150 : 0),
       }
     }
@@ -58,7 +87,7 @@ export default function RealTimeMonitor({ type = 'sdn' }: { type?: 'traditional'
     }, 1000)
 
     return () => clearInterval(interval)
-  }, [isLive, type, wsMetrics])
+  }, [isLive, type, wsMetrics, baseValues])
 
   const getLatencyColor = (latency: number) => latency < 10 ? 'text-green-500' : latency < 20 ? 'text-yellow-500' : 'text-red-500'
   const getThroughputColor = (throughput: number) => throughput > 950 ? 'text-green-500' : throughput > 850 ? 'text-yellow-500' : 'text-red-500'

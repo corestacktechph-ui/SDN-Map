@@ -47,3 +47,4 @@ docker-data/
 *.swp
 *.swo
 .env.local
+__pycache__/

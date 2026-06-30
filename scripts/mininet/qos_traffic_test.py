@@ -302,6 +302,40 @@ if __name__ == '__main__':
         info(f'  │ Video Congested Latency  │ {trad_results["video_congested"]["avg"]:>10.2f} ms  │ {sdn_results["video_congested"]["avg"]:>10.2f} ms  │\n')
         info(f'  └──────────────────────────┴─────────────────┴─────────────────┘\n')
 
+    # ── Post results to dashboard ──
+    try:
+        from post_results import post_comparison, post_results as post_r
+
+        def build_qos_metrics(results_dict):
+            """Convert QoS test results to API format."""
+            metrics = []
+            if 'voip_baseline' in results_dict:
+                metrics.append({"metric": "VoIP Baseline Latency", "value": results_dict["voip_baseline"]["avg"], "unit": "ms",
+                                "min": results_dict["voip_baseline"]["min"], "max": results_dict["voip_baseline"]["max"]})
+            if 'voip_congested' in results_dict:
+                metrics.append({"metric": "VoIP Congested Latency", "value": results_dict["voip_congested"]["avg"], "unit": "ms",
+                                "min": results_dict["voip_congested"]["min"], "max": results_dict["voip_congested"]["max"]})
+                metrics.append({"metric": "Packet Loss", "value": results_dict["voip_congested"]["loss"], "unit": "%"})
+            if 'video_congested' in results_dict:
+                metrics.append({"metric": "Video Congested Latency", "value": results_dict["video_congested"]["avg"], "unit": "ms",
+                                "min": results_dict["video_congested"]["min"], "max": results_dict["video_congested"]["max"]})
+            if 'voip_recovery' in results_dict:
+                metrics.append({"metric": "VoIP Recovery Latency", "value": results_dict["voip_recovery"]["avg"], "unit": "ms"})
+            return metrics
+
+        if args.mode == 'both':
+            trad_metrics = build_qos_metrics(trad_results)
+            sdn_metrics = build_qos_metrics(sdn_results)
+            post_comparison("qos", trad_metrics, sdn_metrics, script_name="qos_traffic_test.py")
+        elif args.mode == 'traditional':
+            post_r("qos", "TRADITIONAL", build_qos_metrics(trad_results), script_name="qos_traffic_test.py")
+        elif args.mode == 'sdn':
+            post_r("qos", "SDN", build_qos_metrics(sdn_results), script_name="qos_traffic_test.py")
+    except ImportError:
+        pass
+    except Exception as e:
+        info(f'\n  ⚠ Could not post results to dashboard: {e}\n')
+
     info(f'\n{"═"*70}\n')
     info(f'  QoS TESTING COMPLETE\n')
     info(f'{"═"*70}\n')

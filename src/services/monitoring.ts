@@ -10,6 +10,9 @@ export interface MonitoringStats {
   recentEvents: number
   activeSessions: number
   controllerStatus: string
+  latency: string
+  throughput: string
+  recoveryTime: string
 }
 
 export interface ControllerInfo {

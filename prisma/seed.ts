@@ -13,7 +13,11 @@ async function main() {
 
   const admin = await prisma.user.upsert({
     where: { email: 'admin@amira-capstone.com' },
-    update: {},
+    update: {
+      password: adminPassword,
+      name: 'Dr. Admin',
+      role: 'ADMIN',
+    },
     create: {
       name: 'Dr. Admin',
       email: 'admin@amira-capstone.com',
@@ -24,7 +28,11 @@ async function main() {
 
   const researcher = await prisma.user.upsert({
     where: { email: 'researcher@amira-capstone.com' },
-    update: {},
+    update: {
+      password: researcherPassword,
+      name: 'Researcher Amira',
+      role: 'RESEARCHER',
+    },
     create: {
       name: 'Researcher Amira',
       email: 'researcher@amira-capstone.com',
@@ -35,7 +43,11 @@ async function main() {
 
   const panelMember = await prisma.user.upsert({
     where: { email: 'panel@amira-capstone.com' },
-    update: {},
+    update: {
+      password: panelPassword,
+      name: 'Panel Member',
+      role: 'PANEL_MEMBER',
+    },
     create: {
       name: 'Panel Member',
       email: 'panel@amira-capstone.com',

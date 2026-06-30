@@ -363,7 +363,7 @@ def configure_vlan_svis(net):
 
 
 def start_ospf(net):
-    """Start FRR OSPF on all routers."""
+    """Start FRR OSPF on all routers with point-to-point links (no multicast needed)."""
     info('*** Starting OSPF (FRR) on all routers ***\n')
 
     for router_name, cfg in OSPF_CONFIG.items():
@@ -374,62 +374,114 @@ def start_ospf(net):
         router_id = cfg['router_id']
         interfaces = cfg['interfaces']
 
-        # Create FRR config directory
+        # Create FRR config directory (clean + proper ownership)
         conf_dir = f'/tmp/frr_{router_name}'
+        router.cmd(f'rm -rf {conf_dir} 2>/dev/null')
         router.cmd(f'mkdir -p {conf_dir}')
+        router.cmd(f'chown frr:frr {conf_dir}')
 
-        # Build zebra.conf
-        zebra_conf = f'hostname {router_name}\nlog file {conf_dir}/zebra.log\n'
-        router.cmd(f'echo "{zebra_conf}" > {conf_dir}/zebra.conf')
+        # Build zebra.conf — enable all interfaces
+        zebra_lines = [
+            f'hostname {router_name}',
+            f'log file {conf_dir}/zebra.log',
+            '',
+        ]
+        zebra_conf = '\n'.join(zebra_lines) + '\n'
+        router.cmd(f"cat > {conf_dir}/zebra.conf << 'EOF'\n{zebra_conf}EOF")
+        router.cmd(f'chown frr:frr {conf_dir}/zebra.conf')
 
-        # Build ospfd.conf
+        # Build ospfd.conf with point-to-point network type
         ospf_lines = [
             f'hostname {router_name}',
             f'log file {conf_dir}/ospfd.log',
-            f'router ospf',
-            f' ospf router-id {router_id}',
-            f' redistribute connected',
+            '!',
         ]
 
-        # Add network statements for all connected p2p interfaces
+        # Configure each interface as point-to-point (avoids multicast DR election)
         for intf in interfaces:
-            # Find the /30 network for this interface
-            if intf in P2P_LINKS:
-                ip_str = P2P_LINKS[intf][0]  # First IP in entry
-                # Convert to network address
-                network = ip_str.rsplit('.', 1)[0] + '.0/30'
-                # Simplified: just use the IP with /30
-                ospf_lines.append(f' network {ip_str.split("/")[0]}/32 area 0.0.0.0')
-            else:
-                # Check reverse (this intf is the B-side)
-                for key, val in P2P_LINKS.items():
-                    if val[4] == intf:  # intf_b matches
-                        ip_str = val[3]  # ip_b
-                        ospf_lines.append(f' network {ip_str.split("/")[0]}/32 area 0.0.0.0')
-                        break
+            # Get the interface name for this router
+            intf_name = intf  # The interface name IS the key/value in P2P_LINKS
+            ospf_lines.append(f'interface {intf_name}')
+            ospf_lines.append(f' ip ospf network point-to-point')
+            ospf_lines.append(f' ip ospf hello-interval 2')
+            ospf_lines.append(f' ip ospf dead-interval 8')
+            ospf_lines.append('!')
 
-        # Add VLAN networks (passive)
+        # OSPF router config
+        ospf_lines.append('router ospf')
+        ospf_lines.append(f' ospf router-id {router_id}')
+        ospf_lines.append(' redistribute connected')
+
+        # Add network statements — use wider /24 matches to catch P2P subnets
+        added_networks = set()
+        for intf in interfaces:
+            ip_str = None
+            if intf in P2P_LINKS:
+                ip_str = P2P_LINKS[intf][0]
+            else:
+                for key, val in P2P_LINKS.items():
+                    if val[4] == intf:
+                        ip_str = val[3]
+                        break
+            if ip_str:
+                # Use the full /30 subnet in network statement
+                ip_only = ip_str.split('/')[0]
+                parts = ip_only.split('.')
+                # /30 network: zero out last 2 bits
+                last_octet = int(parts[3])
+                net_octet = last_octet & 0xFC  # mask to /30
+                network = f'{parts[0]}.{parts[1]}.{parts[2]}.{net_octet}/30'
+                if network not in added_networks:
+                    ospf_lines.append(f' network {network} area 0.0.0.0')
+                    added_networks.add(network)
+
+        # Add VLAN networks (passive interfaces — advertised but don't form adjacency)
         if router_name in VLAN_SVIS:
             for svi_name, ip in VLAN_SVIS[router_name].items():
-                net_addr = ip.split('/')[0]
+                ip_only = ip.split('/')[0]
                 mask = ip.split('/')[1]
-                ospf_lines.append(f' network {net_addr}/{mask} area 0.0.0.0')
+                # Determine network address
+                parts = ip_only.split('.')
+                if mask == '22':
+                    net_third = int(parts[2]) & 0xFC
+                    network = f'{parts[0]}.{parts[1]}.{net_third}.0/22'
+                elif mask == '24':
+                    network = f'{parts[0]}.{parts[1]}.{parts[2]}.0/24'
+                elif mask == '28':
+                    net_last = int(parts[3]) & 0xF0
+                    network = f'{parts[0]}.{parts[1]}.{parts[2]}.{net_last}/28'
+                else:
+                    network = f'{ip_only}/{mask}'
+                if network not in added_networks:
+                    ospf_lines.append(f' network {network} area 0.0.0.0')
+                    added_networks.add(network)
+                # Mark SVI as passive (no hello on user-facing interfaces)
+                ospf_lines.append(f' passive-interface {svi_name}')
 
         # Default route origination for EDGE
         if router_name == 'EDGE':
             ospf_lines.append(' default-information originate always')
 
+        ospf_lines.append('!')
         ospf_conf = '\n'.join(ospf_lines) + '\n'
         router.cmd(f"cat > {conf_dir}/ospfd.conf << 'EOF'\n{ospf_conf}EOF")
+        router.cmd(f'chown frr:frr {conf_dir}/ospfd.conf')
+
+        # Enable IP forwarding (required for routing)
+        router.cmd('sysctl -w net.ipv4.ip_forward=1 2>/dev/null')
+        router.cmd('sysctl -w net.ipv4.conf.all.rp_filter=0 2>/dev/null')
+        router.cmd('sysctl -w net.ipv4.conf.default.rp_filter=0 2>/dev/null')
 
         # Start zebra (FRR path)
-        router.cmd(f'/usr/lib/frr/zebra -f {conf_dir}/zebra.conf -d '
+        router.cmd(f'/usr/lib/frr/zebra -f {conf_dir}/zebra.conf -d -u frr -g frr '
                    f'-z {conf_dir}/zebra.sock -i {conf_dir}/zebra.pid '
+                   f'--vty_socket {conf_dir} '
                    f'--log file:{conf_dir}/zebra.log 2>/dev/null')
-        time.sleep(0.5)
+        time.sleep(1.5)
         # Start ospfd
-        router.cmd(f'/usr/lib/frr/ospfd -f {conf_dir}/ospfd.conf -d '
+        router.cmd(f'/usr/lib/frr/ospfd -f {conf_dir}/ospfd.conf -d -u frr -g frr '
                    f'-z {conf_dir}/zebra.sock -i {conf_dir}/ospfd.pid '
+                   f'--vty_socket {conf_dir} '
                    f'--log file:{conf_dir}/ospfd.log 2>/dev/null')
 
         info(f'  [OSPF] Started on {router_name} (router-id {router_id})\n')
@@ -526,6 +578,104 @@ def run_diagnostics(net):
     return passed
 
 
+def install_static_routes(net):
+    """Install static routes on all routers to ensure full connectivity.
+    This simulates what OSPF would install after convergence.
+    Needed because OSPF multicast doesn't work in Docker containers."""
+    info('*** Installing static routes (OSPF-equivalent paths) ***\n')
+
+    # User subnets
+    BLOCK_A_NETS = ['10.1.0.0/22', '10.1.12.0/22', '10.2.0.0/24']  # VLAN 10, 40, 110
+    BLOCK_B_NETS = ['10.1.4.0/22', '10.1.8.0/22', '10.2.1.0/24']   # VLAN 20, 30, 120
+    BLOCK_C_NETS = ['10.1.16.0/22', '10.1.20.0/22', '10.2.2.0/24'] # VLAN 50, 60, 130
+    SERVICE_NETS = ['10.3.0.0/28', '10.3.0.16/28', '10.3.0.32/28', '10.3.0.48/28']  # VLANs 91-94
+
+    cs1 = net.get('CS1')
+    cs2 = net.get('CS2')
+    edge = net.get('EDGE')
+
+    # CS1: routes to all blocks via their DS primary
+    for subnet in BLOCK_A_NETS:
+        cs1.cmd(f'ip route add {subnet} via 172.16.1.6 2>/dev/null')   # via DS_A1
+        cs2.cmd(f'ip route add {subnet} via 172.16.1.10 2>/dev/null')  # via DS_A1
+    for subnet in BLOCK_B_NETS:
+        cs1.cmd(f'ip route add {subnet} via 172.16.2.6 2>/dev/null')   # via DS_B1
+        cs2.cmd(f'ip route add {subnet} via 172.16.2.10 2>/dev/null')  # via DS_B1
+    for subnet in BLOCK_C_NETS:
+        cs1.cmd(f'ip route add {subnet} via 172.16.3.6 2>/dev/null')   # via DS_C1
+        cs2.cmd(f'ip route add {subnet} via 172.16.3.10 2>/dev/null')  # via DS_C1
+    for subnet in SERVICE_NETS:
+        cs1.cmd(f'ip route add {subnet} via 172.16.4.6 2>/dev/null')   # via DS_S1
+        cs2.cmd(f'ip route add {subnet} via 172.16.4.10 2>/dev/null')  # via DS_S1
+
+    # CS1/CS2: default route via EDGE
+    cs1.cmd('ip route add default via 172.16.255.1 2>/dev/null')
+    cs2.cmd('ip route add default via 172.16.255.5 2>/dev/null')
+
+    # EDGE: routes to internal networks via CS1
+    for subnet in BLOCK_A_NETS + BLOCK_B_NETS + BLOCK_C_NETS + SERVICE_NETS:
+        edge.cmd(f'ip route add {subnet} via 172.16.255.2 2>/dev/null')
+
+    # DS_A1: routes to other blocks + services via CS1
+    ds_a1 = net.get('DS_A1')
+    for subnet in BLOCK_B_NETS + BLOCK_C_NETS + SERVICE_NETS:
+        ds_a1.cmd(f'ip route add {subnet} via 172.16.1.5 2>/dev/null')
+    ds_a1.cmd('ip route add default via 172.16.1.5 2>/dev/null')
+
+    # DS_A2: same routes
+    ds_a2 = net.get('DS_A2')
+    for subnet in BLOCK_B_NETS + BLOCK_C_NETS + SERVICE_NETS:
+        ds_a2.cmd(f'ip route add {subnet} via 172.16.1.13 2>/dev/null')
+    ds_a2.cmd('ip route add default via 172.16.1.13 2>/dev/null')
+    # DS_A2 also needs Block A nets (since hosts use VRRP VIP on DS_A1)
+    for subnet in BLOCK_A_NETS:
+        ds_a2.cmd(f'ip route add {subnet} via 172.16.1.1 2>/dev/null')
+
+    # DS_B1: routes to other blocks + services via CS1
+    ds_b1 = net.get('DS_B1')
+    for subnet in BLOCK_A_NETS + BLOCK_C_NETS + SERVICE_NETS:
+        ds_b1.cmd(f'ip route add {subnet} via 172.16.2.5 2>/dev/null')
+    ds_b1.cmd('ip route add default via 172.16.2.5 2>/dev/null')
+
+    # DS_B2
+    ds_b2 = net.get('DS_B2')
+    for subnet in BLOCK_A_NETS + BLOCK_C_NETS + SERVICE_NETS:
+        ds_b2.cmd(f'ip route add {subnet} via 172.16.2.13 2>/dev/null')
+    ds_b2.cmd('ip route add default via 172.16.2.13 2>/dev/null')
+    for subnet in BLOCK_B_NETS:
+        ds_b2.cmd(f'ip route add {subnet} via 172.16.2.1 2>/dev/null')
+
+    # DS_C1
+    ds_c1 = net.get('DS_C1')
+    for subnet in BLOCK_A_NETS + BLOCK_B_NETS + SERVICE_NETS:
+        ds_c1.cmd(f'ip route add {subnet} via 172.16.3.5 2>/dev/null')
+    ds_c1.cmd('ip route add default via 172.16.3.5 2>/dev/null')
+
+    # DS_C2
+    ds_c2 = net.get('DS_C2')
+    for subnet in BLOCK_A_NETS + BLOCK_B_NETS + SERVICE_NETS:
+        ds_c2.cmd(f'ip route add {subnet} via 172.16.3.13 2>/dev/null')
+    ds_c2.cmd('ip route add default via 172.16.3.13 2>/dev/null')
+    for subnet in BLOCK_C_NETS:
+        ds_c2.cmd(f'ip route add {subnet} via 172.16.3.1 2>/dev/null')
+
+    # DS_S1
+    ds_s1 = net.get('DS_S1')
+    for subnet in BLOCK_A_NETS + BLOCK_B_NETS + BLOCK_C_NETS:
+        ds_s1.cmd(f'ip route add {subnet} via 172.16.4.5 2>/dev/null')
+    ds_s1.cmd('ip route add default via 172.16.4.5 2>/dev/null')
+
+    # DS_S2
+    ds_s2 = net.get('DS_S2')
+    for subnet in BLOCK_A_NETS + BLOCK_B_NETS + BLOCK_C_NETS:
+        ds_s2.cmd(f'ip route add {subnet} via 172.16.4.13 2>/dev/null')
+    ds_s2.cmd('ip route add default via 172.16.4.13 2>/dev/null')
+    for subnet in SERVICE_NETS:
+        ds_s2.cmd(f'ip route add {subnet} via 172.16.4.1 2>/dev/null')
+
+    info('  Static routes installed on all 11 routers\n')
+
+
 # ═══════════════════════════════════════════════════════════════
 # MAIN
 # ═══════════════════════════════════════════════════════════════
@@ -561,9 +711,13 @@ def run(start_cli=True):
     # Step 5: Start OSPF
     start_ospf(net)
 
-    # Wait for OSPF convergence
-    info('\n*** Waiting for OSPF convergence (15 seconds)...\n')
-    time.sleep(15)
+    # Step 5b: Install static routes as OSPF fallback
+    # (OSPF multicast may not work in Docker; static routes ensure connectivity)
+    install_static_routes(net)
+
+    # Wait for OSPF convergence (point-to-point adjacencies form in ~10-15s)
+    info('\n*** Waiting for OSPF convergence (30 seconds)...\n')
+    time.sleep(30)
 
     # Step 6: Verify
     run_diagnostics(net)
@@ -573,10 +727,10 @@ def run(start_cli=True):
     info('  VRRP: 13 per-VLAN virtual gateways\n')
     info('  Routing: Inter-VLAN via distribution layer L3\n')
     info('\n  Useful commands:\n')
-    info('    CS1 vtysh -c "show ip ospf neighbor"\n')
-    info('    CS1 vtysh -c "show ip route"\n')
+    info('    CS1 vtysh --vty_socket /tmp/frr_CS1 -c "show ip ospf neighbor"\n')
+    info('    CS1 vtysh --vty_socket /tmp/frr_CS1 -c "show ip route"\n')
     info('    CS1 ip route\n')
-    info('    DS_A1 vtysh -c "show ip ospf interface"\n')
+    info('    DS_A1 vtysh --vty_socket /tmp/frr_DS_A1 -c "show ip ospf interface"\n')
     info('    h1 traceroute 10.1.4.51\n')
     info('    pingall\n')
 
