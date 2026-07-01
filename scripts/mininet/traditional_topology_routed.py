@@ -129,16 +129,16 @@ VLAN_SVIS = {
         'vlan130': '10.2.2.253/24',
     },
     'DS_S1': {
-        'vlan91': '10.3.0.13/28',
-        'vlan92': '10.3.0.29/28',
-        'vlan93': '10.3.0.45/28',
-        'vlan94': '10.3.0.61/28',
-    },
-    'DS_S2': {
         'vlan91': '10.3.0.12/28',
         'vlan92': '10.3.0.28/28',
         'vlan93': '10.3.0.44/28',
         'vlan94': '10.3.0.60/28',
+    },
+    'DS_S2': {
+        'vlan91': '10.3.0.13/28',
+        'vlan92': '10.3.0.29/28',
+        'vlan93': '10.3.0.45/28',
+        'vlan94': '10.3.0.61/28',
     },
 }
 
@@ -711,9 +711,8 @@ def run(start_cli=True):
     # Step 5: Start OSPF
     start_ospf(net)
 
-    # Step 5b: Install static routes as OSPF fallback
-    # (OSPF multicast may not work in Docker; static routes ensure connectivity)
-    install_static_routes(net)
+    # OSPF handles all routing dynamically — no static routes needed
+    # (Previously had install_static_routes() here which conflicted with OSPF)
 
     # Wait for OSPF convergence (point-to-point adjacencies form in ~10-15s)
     info('\n*** Waiting for OSPF convergence (30 seconds)...\n')
