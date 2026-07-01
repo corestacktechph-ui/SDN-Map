@@ -21,7 +21,6 @@ import {
   AlertTriangle,
   Wrench,
   ArrowRight,
-  Layers,
   ClipboardCheck,
   BrainCircuit,
 } from 'lucide-react'
@@ -37,7 +36,6 @@ const menuItems = [
   { href: '/dashboard/migration', label: 'Migration Model', icon: ArrowRight },
   { href: '/dashboard/readiness', label: 'Readiness', icon: ClipboardCheck },
   { href: '/dashboard/decision-support', label: 'Decision Support', icon: BrainCircuit },
-  { href: '/dashboard/zachman', label: 'Zachman Framework', icon: Layers },
   { href: '/dashboard/testing', label: 'Testing', icon: FlaskConical },
   { href: '/dashboard/analytics', label: 'Analytics', icon: BarChart3 },
   { href: '/dashboard/reports', label: 'Reports', icon: FileText },

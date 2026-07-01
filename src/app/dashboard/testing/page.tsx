@@ -208,18 +208,22 @@ export default function TestingPage() {
                 <label className="block text-sm font-medium mb-1.5">Source Device</label>
                 <select className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm">
                   <option value="">Select source...</option>
-                  <option value="host_a1">Host A1</option>
-                  <option value="host_b1">Host B1</option>
-                  <option value="host_c1">Host C1</option>
+                  <option value="h1">h1 — Finance (VLAN 10, Block A)</option>
+                  <option value="h10">h10 — HR (VLAN 20, Block B)</option>
+                  <option value="h19">h19 — Corporate (VLAN 50, Block C)</option>
+                  <option value="h7">h7 — Guest A (VLAN 110)</option>
+                  <option value="h13">h13 — IT (VLAN 30, Block B)</option>
                 </select>
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1.5">Target Device</label>
                 <select className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm">
                   <option value="">Select target...</option>
-                  <option value="erp_server">ERP Server</option>
-                  <option value="hr_server">HR Server</option>
-                  <option value="voip_server">VoIP Server</option>
+                  <option value="erp_server">ERP Server (10.3.0.1)</option>
+                  <option value="hr_server">HR Server (10.3.0.17)</option>
+                  <option value="voip_server">VoIP Server (10.3.0.49)</option>
+                  <option value="monitor1">Monitor Server (10.3.0.18)</option>
+                  <option value="inet">INET — Internet (198.51.100.100)</option>
                 </select>
               </div>
             </div>

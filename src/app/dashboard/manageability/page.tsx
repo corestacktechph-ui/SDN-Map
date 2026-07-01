@@ -30,14 +30,6 @@ const manageabilityRadar = [
   { category: 'Staff Efficiency', traditional: 3, sdn: 7 },
 ]
 
-const costData = [
-  { category: 'Staff (Monthly)', traditional: 45000, sdn: 15000, unit: 'PHP' },
-  { category: 'Config Time/Day', traditional: 345, sdn: 80, unit: 'min' },
-  { category: 'Troubleshoot/Week', traditional: 300, sdn: 75, unit: 'min' },
-  { category: 'Devices to Manage', traditional: 42, sdn: 1, unit: 'count' },
-  { category: 'Error Incidents/Month', traditional: 12, sdn: 2, unit: 'incidents' },
-]
-
 const scenarioSteps = [
   {
     title: 'Add New Department VLAN',
@@ -109,7 +101,6 @@ export default function ManageabilityPage() {
         <TabsList>
           <TabsTrigger value="tasks"><Clock className="h-4 w-4 mr-2" />Task Comparison</TabsTrigger>
           <TabsTrigger value="radar"><BarChart3 className="h-4 w-4 mr-2" />Capability Radar</TabsTrigger>
-          <TabsTrigger value="cost"><DollarSign className="h-4 w-4 mr-2" />Cost & Effort</TabsTrigger>
           <TabsTrigger value="scenarios"><Wrench className="h-4 w-4 mr-2" />Real Scenarios</TabsTrigger>
         </TabsList>
 
@@ -203,46 +194,6 @@ export default function ManageabilityPage() {
               </Card>
             </div>
           </div>
-        </TabsContent>
-
-        {/* Cost & Effort */}
-        <TabsContent value="cost">
-          <Card>
-            <CardHeader><CardTitle className="text-lg">Operational Cost & Effort Comparison</CardTitle></CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {costData.map((item, i) => (
-                  <motion.div key={item.category} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.1 }}
-                    className="rounded-lg border p-4"
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium">{item.category}</span>
-                      <span className="text-xs text-muted-foreground">{item.unit}</span>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <div className="flex-1">
-                        <div className="flex justify-between text-xs mb-1">
-                          <span className="text-red-500">Traditional: {item.traditional}</span>
-                          <span className="text-emerald-500">SDN: {item.sdn}</span>
-                        </div>
-                        <div className="h-3 rounded-full bg-muted overflow-hidden">
-                          <div className="h-full bg-red-500/60 rounded-full float-left" style={{ width: `${(item.traditional / (item.traditional + item.sdn)) * 100}%` }} />
-                        </div>
-                        <div className="h-3 rounded-full bg-muted overflow-hidden mt-0.5">
-                          <div className="h-full bg-emerald-500/60 rounded-full float-left" style={{ width: `${(item.sdn / (item.traditional + item.sdn)) * 100}%` }} />
-                        </div>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <Badge variant="default" className="bg-green-500 text-xs">
-                          {Math.round(((item.traditional - item.sdn) / item.traditional) * 100)}% less
-                        </Badge>
-                      </div>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
         </TabsContent>
 
         {/* Real Scenarios */}
