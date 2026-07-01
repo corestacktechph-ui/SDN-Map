@@ -5,7 +5,6 @@ RUN apt-get update && apt-get install -y \
     python3-dev \
     libffi-dev \
     libssl-dev \
-    git \
     && rm -rf /var/lib/apt/lists/*
 
 RUN pip install --no-cache-dir --upgrade pip && \
@@ -16,8 +15,8 @@ RUN pip install --no-cache-dir \
     webob \
     routes \
     ovs \
-    six && \
-    pip install --no-cache-dir git+https://github.com/faucetsdn/ryu.git
+    six \
+    ryu
 
 WORKDIR /app
 
