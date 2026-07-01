@@ -174,12 +174,72 @@ class MigrationTopo(Topo):
         info('*** Topology built: 27 hosts + 6 services + internet\n')
 
 
+def _run_simplified_phase0(start_cli=True):
+    """Fallback Phase 0 — simplified OVS baseline (if traditional_topology_final not available)."""
+    subprocess.call('mn -c 2>/dev/null || true', shell=True,
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    time.sleep(2)
+
+    topo = MigrationTopo(sdn_switches=[])
+    net = Mininet(topo=topo, switch=OVSKernelSwitch, controller=None,
+                  build=True, ipBase='10.0.0.0/8')
+    net.start()
+
+    for sw in net.switches:
+        sw.cmd(f'ovs-vsctl set bridge {sw.name} fail_mode=standalone')
+
+    info('\n*** Simplified Phase 0 baseline (OVS standalone)\n')
+    info('*** Note: For full baseline with OSPF+VRRP+ACL, run traditional_topology_final.py\n')
+
+    test_pairs = [
+        ('h1', 'h2', 'Same VLAN (VLAN 10)'),
+        ('h10', 'h11', 'Same VLAN (VLAN 20)'),
+        ('h19', 'h20', 'Same VLAN (VLAN 50)'),
+    ]
+    time.sleep(3)
+    for src, dst, desc in test_pairs:
+        h_src = net.get(src)
+        h_dst = net.get(dst)
+        if h_src and h_dst:
+            result = h_src.cmd(f'ping -c 2 -W 2 {h_dst.IP()} 2>&1')
+            status = '✓ OK' if ping_success(result) else '✗ FAIL'
+            info(f'  {src} -> {dst} ({desc}): {status}\n')
+
+    if start_cli:
+        CLI(net)
+    net.stop()
+
+
 def run_phase(phase_num, start_cli=True):
     """Run a specific migration phase."""
     setLogLevel('info')
 
+    # Phase 0 uses the full traditional_topology_final as baseline
+    # (OSPF + VRRP + ACL — the actual traditional network before migration)
+    if phase_num == 0:
+        info(f'\n{"="*60}\n')
+        info(f'  PHASE 0 — Baseline Traditional (OSPF + VRRP + ACL)\n')
+        info(f'  Running traditional_topology_final as the baseline\n')
+        info(f'{"="*60}\n\n')
+
+        # Import and run the final traditional topology
+        try:
+            import sys
+            import os
+            sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+            from traditional_topology_final import run as run_traditional_final
+            run_traditional_final(start_cli=start_cli)
+        except ImportError as e:
+            error(f'Cannot import traditional_topology_final: {e}\n')
+            error('Falling back to simplified baseline...\n')
+            _run_simplified_phase0(start_cli)
+        return
+
+    # Phases 1-5: Progressive migration from traditional to SDN
     # Clean previous
     subprocess.call('mn -c 2>/dev/null || true', shell=True,
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.call('pkill -f keepalived 2>/dev/null || true', shell=True,
                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     time.sleep(2)
 
@@ -188,12 +248,9 @@ def run_phase(phase_num, start_cli=True):
     use_controller = False
     phase_desc = ''
 
-    if phase_num == 0:
-        phase_desc = 'PHASE 0 — Baseline Traditional (All switches standalone)'
+    if phase_num == 1:
+        phase_desc = 'PHASE 1 — Controller Deployed (monitor-only, all switches still traditional)'
         sdn_sw = []
-    elif phase_num == 1:
-        phase_desc = 'PHASE 1 — Controller Deployed (monitor-only, no forwarding change)'
-        sdn_sw = []  # Controller connects but switches still standalone
         use_controller = True
     elif phase_num == 2:
         phase_desc = 'PHASE 2 — Block C Pilot (DS_C1, DS_C2, AS_C1 → SDN)'
@@ -285,9 +342,15 @@ def run_phase(phase_num, start_cli=True):
 
 
 def run_all_phases():
-    """Run all 6 phases sequentially with validation."""
+    """Run all 6 phases sequentially with validation.
+    
+    Phase 0 uses traditional_topology_final (OSPF + VRRP + ACL baseline).
+    Phases 1-5 progressively migrate from traditional to full SDN.
+    """
     info('\n' + '='*60 + '\n')
     info('  RUNNING ALL 6 MIGRATION PHASES SEQUENTIALLY\n')
+    info('  Phase 0: traditional_topology_final (OSPF + VRRP + ACL)\n')
+    info('  Phases 1-5: Progressive migration to full SDN\n')
     info('='*60 + '\n')
 
     for phase in range(6):

@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts'
-import { Clock, Settings, Wrench, BarChart3, Activity, Shield, Users, DollarSign, CheckCircle2, XCircle } from 'lucide-react'
+import { Clock, Settings, Wrench, BarChart3, Activity, Shield, CheckCircle2, XCircle } from 'lucide-react'
 
 const taskData = [
   { task: 'Add VLAN', traditional: 17.5, sdn: 2.5, unit: 'min', savings: 86 },
@@ -174,8 +174,6 @@ export default function ManageabilityPage() {
                     { icon: Activity, label: 'Automated Provisioning', desc: 'Zero-touch configuration via REST API' },
                     { icon: Shield, label: 'Policy Consistency', desc: 'ACLs/QoS applied network-wide instantly' },
                     { icon: Clock, label: 'Faster Troubleshooting', desc: '67-75% reduction in mean time to resolve' },
-                    { icon: Users, label: 'Reduced Staff Needs', desc: '3 technicians → 1 with SDN orchestration' },
-                    { icon: DollarSign, label: 'Lower OPEX', desc: '60-85% reduction in operational overhead' },
                   ].map((item, i) => {
                     const Icon = item.icon
                     return (

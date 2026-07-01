@@ -21,8 +21,6 @@ import {
   AlertTriangle,
   Wrench,
   ArrowRight,
-  ClipboardCheck,
-  BrainCircuit,
 } from 'lucide-react'
 import { signOut, useSession } from 'next-auth/react'
 import { useAppStore } from '@/store/appStore'
@@ -34,8 +32,6 @@ const menuItems = [
   { href: '/dashboard/sdn', label: 'SDN Network', icon: Radio },
   { href: '/dashboard/manageability', label: 'Manageability', icon: Wrench },
   { href: '/dashboard/migration', label: 'Migration Model', icon: ArrowRight },
-  { href: '/dashboard/readiness', label: 'Readiness', icon: ClipboardCheck },
-  { href: '/dashboard/decision-support', label: 'Decision Support', icon: BrainCircuit },
   { href: '/dashboard/testing', label: 'Testing', icon: FlaskConical },
   { href: '/dashboard/analytics', label: 'Analytics', icon: BarChart3 },
   { href: '/dashboard/reports', label: 'Reports', icon: FileText },

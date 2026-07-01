@@ -299,8 +299,38 @@ def run(start_cli=True):
     info('    h7 ping 10.1.0.51  (Guest → internal: blocked)\n')
     info('    h7 ping 198.51.100.100  (Guest → internet: works)\n')
 
+    # Notify web dashboard that simulation is running — update device statuses
+    try:
+        import sys as _sys
+        import os as _os
+        _sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
+        from post_results import post_device_status, post_alert, TRADITIONAL_DEVICES
+        post_device_status("TRADITIONAL", TRADITIONAL_DEVICES, status="ONLINE")
+        post_alert(
+            title="Traditional Network Simulation Started",
+            message="traditional_topology_final.py is running — OSPF + VRRP + ACL enforcement active. All 14 switches and 6 servers online.",
+            severity="INFO",
+            source="mininet"
+        )
+    except Exception:
+        pass  # Dashboard update optional — simulation continues regardless
+
     if start_cli:
         CLI(net)
+
+    # Notify web dashboard that simulation stopped
+    try:
+        from post_results import reset_devices, post_alert
+        reset_devices("TRADITIONAL")
+        post_alert(
+            title="Traditional Network Simulation Stopped",
+            message="traditional_topology_final.py has exited. All devices set to OFFLINE.",
+            severity="INFO",
+            source="mininet"
+        )
+    except Exception:
+        pass
+
     net.stop()
 
 

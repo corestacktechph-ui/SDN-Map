@@ -288,6 +288,20 @@ def test_core_failover(net, mode_name):
     for neighbor in cs1_neighbors:
         bring_link_down(net, 'CS1', neighbor)
 
+    # Post alert to web dashboard — link failure detected
+    try:
+        import sys as _sys, os as _os
+        _sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
+        from post_results import post_alert
+        post_alert(
+            title=f"Core Switch Failure: CS1 ({mode_name})",
+            message=f"All CS1 uplinks brought down during failover test. Traffic rerouting via CS2. Network: {mode_name}.",
+            severity="CRITICAL",
+            source="mininet-failover"
+        )
+    except Exception:
+        pass
+
     info('\n  ⏳ Waiting for network convergence (5 seconds)...\n')
     time.sleep(5)
 
@@ -329,6 +343,19 @@ def test_core_failover(net, mode_name):
         info(f'\n    ✓ CORE FAILOVER TEST PASSED — Traffic successfully rerouted via CS2\n')
     else:
         info(f'\n    ✗ CORE FAILOVER PARTIAL — {total - during_pass} paths lost during failover\n')
+
+    # Post recovery alert to web dashboard
+    try:
+        from post_results import post_alert
+        severity = "INFO" if during_pass == total else "HIGH"
+        post_alert(
+            title=f"Core Failover Recovery: CS1 Restored ({mode_name})",
+            message=f"CS1 links restored. Failover result: {during_pass}/{total} paths survived during outage. Recovery: {after_pass}/{total} paths restored. Network: {mode_name}.",
+            severity=severity,
+            source="mininet-failover"
+        )
+    except Exception:
+        pass
 
     return results
 
@@ -372,6 +399,20 @@ def test_access_distribution_failover(net, mode_name):
 
     bring_link_down(net, 'AS_A1', 'DS_A1')
 
+    # Post alert to web dashboard
+    try:
+        import sys as _sys, os as _os
+        _sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
+        from post_results import post_alert
+        post_alert(
+            title=f"Link Failure: AS_A1 to DS_A1 ({mode_name})",
+            message=f"Primary uplink AS_A1 to DS_A1 is DOWN. Block A traffic rerouting via AS_A1 to DS_A2 redundant path. Network: {mode_name}.",
+            severity="HIGH",
+            source="mininet-failover"
+        )
+    except Exception:
+        pass
+
     info('\n  ⏳ Waiting for network convergence (5 seconds)...\n')
     time.sleep(5)
 
@@ -412,6 +453,19 @@ def test_access_distribution_failover(net, mode_name):
         info(f'\n    ✓ ACCESS-DISTRIBUTION FAILOVER PASSED — Traffic via DS_A2 redundant path\n')
     else:
         info(f'\n    ✗ ACCESS-DISTRIBUTION FAILOVER PARTIAL — {total - during_pass} paths lost\n')
+
+    # Post recovery alert to web dashboard
+    try:
+        from post_results import post_alert
+        severity = "INFO" if during_pass == total else "MEDIUM"
+        post_alert(
+            title=f"Access-Distribution Failover Recovery ({mode_name})",
+            message=f"AS_A1-DS_A1 link restored. Failover result: {during_pass}/{total} paths survived via DS_A2. Recovery: {after_pass}/{total} restored. Network: {mode_name}.",
+            severity=severity,
+            source="mininet-failover"
+        )
+    except Exception:
+        pass
 
     return results
 

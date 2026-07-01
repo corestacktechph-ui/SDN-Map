@@ -126,6 +126,110 @@ def post_comparison(test_type, trad_results, sdn_results, script_name=None, raw_
     return trad_response, sdn_response
 
 
+def post_device_status(architecture, device_names, status="ONLINE", api_url=None):
+    """
+    Update device statuses on the web dashboard.
+    Call this when simulation starts (status="ONLINE") or stops (use reset_devices instead).
+
+    Args:
+        architecture: str - "TRADITIONAL" or "SDN"
+        device_names: list of str - e.g. ["CS1", "CS2", "DS_A1", ...]
+        status: str - "ONLINE" or "OFFLINE"
+        api_url: str - override the API base URL
+    """
+    url = (api_url or API_URL).rstrip("/") + "/api/devices"
+    devices = [{"name": name, "status": status} for name in device_names]
+    payload = {"architecture": architecture.upper(), "devices": devices}
+    data = json.dumps(payload).encode("utf-8")
+    req = Request(url, data=data, headers={"Content-Type": "application/json"})
+    req.get_method = lambda: "PATCH"
+
+    try:
+        response = urlopen(req, timeout=10)
+        response_data = json.loads(response.read().decode("utf-8"))
+        print(f"\n✓ Device status updated: {len(device_names)} devices → {status} ({architecture})")
+        return response_data
+    except Exception as e:
+        print(f"\n✗ Failed to update device status: {e}")
+        return None
+
+
+def reset_devices(architecture, api_url=None):
+    """
+    Reset all devices to OFFLINE when simulation stops.
+
+    Args:
+        architecture: str - "TRADITIONAL" or "SDN"
+        api_url: str - override the API base URL
+    """
+    url = (api_url or API_URL).rstrip("/") + "/api/devices"
+    payload = {"architecture": architecture.upper(), "action": "reset"}
+    data = json.dumps(payload).encode("utf-8")
+    req = Request(url, data=data, headers={"Content-Type": "application/json"})
+
+    try:
+        response = urlopen(req, timeout=10)
+        print(f"\n✓ All {architecture} devices reset to OFFLINE")
+        return json.loads(response.read().decode("utf-8"))
+    except Exception as e:
+        print(f"\n✗ Failed to reset devices: {e}")
+        return None
+
+
+def post_alert(title, message, severity="HIGH", source="mininet", api_url=None):
+    """
+    Post a network alert to the web dashboard.
+    Use this for link failures, failover events, and topology changes.
+
+    Args:
+        title: str - short alert title e.g. "Link Failure: CS1"
+        message: str - detailed description
+        severity: str - "CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"
+        source: str - source identifier
+        api_url: str - override the API base URL
+
+    Example:
+        post_alert(
+            title="Core Switch Failure",
+            message="CS1 links down — traffic rerouted via CS2. Recovery time: 1.2s",
+            severity="CRITICAL"
+        )
+    """
+    url = (api_url or API_URL).rstrip("/") + "/api/alerts"
+    payload = {
+        "title": title,
+        "message": message,
+        "severity": severity.upper(),
+        "source": source,
+    }
+    data = json.dumps(payload).encode("utf-8")
+    req = Request(url, data=data, headers={"Content-Type": "application/json"})
+
+    try:
+        response = urlopen(req, timeout=10)
+        response_data = json.loads(response.read().decode("utf-8"))
+        print(f"\n✓ Alert posted: [{severity.upper()}] {title}")
+        return response_data
+    except Exception as e:
+        print(f"\n✗ Failed to post alert: {e}")
+        return None
+
+
+# ─────────────────────────────────────────────
+# Standard device lists for quick reference
+# ─────────────────────────────────────────────
+TRADITIONAL_DEVICES = [
+    "CS1", "CS2",
+    "DS_A1", "DS_A2", "DS_B1", "DS_B2",
+    "DS_C1", "DS_C2", "DS_S1", "DS_S2",
+    "AS_A1", "AS_B1", "AS_C1", "AS_S1",
+    "ERP-Server", "HR-Server", "Monitoring-Server",
+    "IT-Server", "VoIP-Server", "DHCP-Server",
+]
+
+SDN_DEVICES = TRADITIONAL_DEVICES  # same logical topology
+
+
 if __name__ == "__main__":
     # Quick test — run this standalone to verify connectivity
     print("Testing API connectivity...")
